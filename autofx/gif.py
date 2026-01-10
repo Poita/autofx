@@ -1,13 +1,15 @@
 """
-GIF creation with transparency support.
+GIF and sprite sheet creation with transparency support.
 
-Handles the conversion of RGBA frames to animated GIF format
-with proper transparency handling.
+Handles the conversion of RGBA frames to:
+- Animated GIF format with proper transparency
+- PNG sprite sheets for game engines
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from pathlib import Path
 from PIL import Image
+import math
 import io
 
 
@@ -212,3 +214,80 @@ def frame_to_base64_png(frame: Image.Image) -> str:
     frame.save(buffer, format='PNG')
     buffer.seek(0)
     return base64.b64encode(buffer.read()).decode('utf-8')
+
+
+def save_spritesheet(
+    frames: List[Image.Image],
+    output_path: str,
+    rows: Optional[int] = None
+) -> Tuple[int, int]:
+    """
+    Save frames as a PNG sprite sheet.
+
+    Frames are arranged in a grid, left-to-right, top-to-bottom.
+
+    Args:
+        frames: List of PIL Images in RGBA mode
+        output_path: Path to save the PNG sprite sheet
+        rows: Number of rows in the grid. If None, auto-calculated for a square-ish layout.
+
+    Returns:
+        Tuple of (columns, rows) in the sprite sheet
+    """
+    if not frames:
+        raise ValueError("No frames to save")
+
+    num_frames = len(frames)
+    frame_width = frames[0].width
+    frame_height = frames[0].height
+
+    # Calculate grid dimensions
+    if rows is None:
+        # Auto-calculate for approximately square layout
+        rows = max(1, int(math.sqrt(num_frames)))
+        cols = math.ceil(num_frames / rows)
+    else:
+        rows = max(1, min(rows, num_frames))
+        cols = math.ceil(num_frames / rows)
+
+    # Create the sprite sheet
+    sheet_width = cols * frame_width
+    sheet_height = rows * frame_height
+    spritesheet = Image.new('RGBA', (sheet_width, sheet_height), (0, 0, 0, 0))
+
+    # Paste frames into the sheet
+    for i, frame in enumerate(frames):
+        if frame.mode != 'RGBA':
+            frame = frame.convert('RGBA')
+
+        col = i % cols
+        row = i // cols
+        x = col * frame_width
+        y = row * frame_height
+        spritesheet.paste(frame, (x, y))
+
+    # Save as PNG
+    spritesheet.save(output_path, format='PNG')
+
+    return cols, rows
+
+
+def get_spritesheet_layout(num_frames: int, rows: Optional[int] = None) -> Tuple[int, int]:
+    """
+    Calculate the sprite sheet grid layout without creating the image.
+
+    Args:
+        num_frames: Total number of frames
+        rows: Optional number of rows (auto-calculated if None)
+
+    Returns:
+        Tuple of (columns, rows)
+    """
+    if rows is None:
+        rows = max(1, int(math.sqrt(num_frames)))
+        cols = math.ceil(num_frames / rows)
+    else:
+        rows = max(1, min(rows, num_frames))
+        cols = math.ceil(num_frames / rows)
+
+    return cols, rows

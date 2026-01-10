@@ -45,8 +45,15 @@ Examples:
     # High-quality with more frames
     autofx "lightning strike" -d 1.0 -r 256x256 -f 60 -o lightning.gif
 
+    # With PNG sprite sheet (auto grid layout)
+    autofx "energy ball" -f 16 -s -o energy.gif
+
+    # Sprite sheet with specific row count
+    autofx "coin spin" --loop -f 8 -s --rows 1 -o coin.gif
+
 The generated shader code is automatically saved alongside the GIF.
 For example, explosion.gif will have explosion.glsl saved next to it.
+With -s/--spritesheet, a PNG sprite sheet is also saved (e.g., explosion.png).
         """
     )
 
@@ -104,12 +111,27 @@ For example, explosion.gif will have explosion.glsl saved next to it.
         help="Create a seamlessly looping effect (default: one-shot effect that dissipates)"
     )
 
+    parser.add_argument(
+        "-s", "--spritesheet",
+        action="store_true",
+        help="Also output a PNG sprite sheet (all frames in a grid)"
+    )
+
+    parser.add_argument(
+        "--rows",
+        type=int,
+        default=None,
+        help="Number of rows in sprite sheet (default: auto-calculated for square-ish layout)"
+    )
+
     return parser
 
 
 async def run_async(args: argparse.Namespace) -> int:
     """Run the VFX generation asynchronously."""
     from .agent import generate_vfx
+    from .gif import save_spritesheet, get_spritesheet_layout
+    from .renderer import render_shader
 
     # Ensure output path has .gif extension
     output_path = args.output
@@ -122,6 +144,9 @@ async def run_async(args: argparse.Namespace) -> int:
     print(f"  Frames: {args.frames}")
     print(f"  Mode: {'looping' if args.loop else 'one-shot (dissipates)'}")
     print(f"  Output: {output_path}")
+    if args.spritesheet:
+        cols, rows = get_spritesheet_layout(args.frames, args.rows)
+        print(f"  Sprite sheet: {cols}x{rows} grid")
     print()
 
     try:
@@ -141,6 +166,25 @@ async def run_async(args: argparse.Namespace) -> int:
             print("Success!")
             print(f"  GIF: {result['gif_path']}")
             print(f"  Shader: {result['shader_path']}")
+
+            # Generate sprite sheet if requested
+            if args.spritesheet and result.get("shader_code"):
+                spritesheet_path = Path(output_path).with_suffix('.png')
+                print(f"  Generating sprite sheet...")
+
+                # Re-render frames for the sprite sheet
+                frames = render_shader(
+                    shader_code=result["shader_code"],
+                    duration=args.duration,
+                    resolution=args.resolution,
+                    num_frames=args.frames
+                )
+
+                cols, rows = save_spritesheet(frames, str(spritesheet_path), args.rows)
+                sheet_width = cols * args.resolution[0]
+                sheet_height = rows * args.resolution[1]
+                print(f"  Sprite sheet: {spritesheet_path} ({sheet_width}x{sheet_height}, {cols}x{rows} grid)")
+
             return 0
         else:
             print()

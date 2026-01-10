@@ -43,9 +43,10 @@ from .renderer import (
     ShaderRenderer,
 )
 
-# GIF export
+# GIF and sprite sheet export
 from .gif import (
     save_gif,
+    save_spritesheet,
     frame_to_base64_png,
     frames_to_base64_gif,
 )
@@ -60,8 +61,9 @@ __all__ = [
     "render_shader",
     "compile_shader",
     "ShaderRenderer",
-    # GIF utilities
+    # Export utilities
     "save_gif",
+    "save_spritesheet",
     "frame_to_base64_png",
     "frames_to_base64_gif",
 ]
