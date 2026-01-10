@@ -36,9 +36,14 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+    # One-shot effect (dissipates by end)
     autofx "fiery explosion" -o explosion.gif
-    autofx "magic sparkles" --duration 2.0 --resolution 128x128 --frames 20 -o sparkles.gif
-    autofx "swirling vortex" -d 1.5 -r 256x256 -f 15 -o vortex.gif
+
+    # Looping effect (seamless loop)
+    autofx "magical flames" --loop -d 2.0 -o flames.gif
+
+    # High-quality with more frames
+    autofx "lightning strike" -d 1.0 -r 256x256 -f 60 -o lightning.gif
 
 The generated shader code is automatically saved alongside the GIF.
 For example, explosion.gif will have explosion.glsl saved next to it.
@@ -93,6 +98,12 @@ For example, explosion.gif will have explosion.glsl saved next to it.
         help="Maximum retry attempts if generation fails (default: 3)"
     )
 
+    parser.add_argument(
+        "-l", "--loop",
+        action="store_true",
+        help="Create a seamlessly looping effect (default: one-shot effect that dissipates)"
+    )
+
     return parser
 
 
@@ -109,6 +120,7 @@ async def run_async(args: argparse.Namespace) -> int:
     print(f"  Resolution: {args.resolution[0]}x{args.resolution[1]}")
     print(f"  Duration: {args.duration}s")
     print(f"  Frames: {args.frames}")
+    print(f"  Mode: {'looping' if args.loop else 'one-shot (dissipates)'}")
     print(f"  Output: {output_path}")
     print()
 
@@ -120,7 +132,8 @@ async def run_async(args: argparse.Namespace) -> int:
             frames=args.frames,
             output_path=output_path,
             max_retries=args.max_retries,
-            verbose=args.verbose
+            verbose=args.verbose,
+            loop=args.loop
         )
 
         if result["success"]:

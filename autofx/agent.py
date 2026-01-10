@@ -66,13 +66,25 @@ def build_prompt(
     effect_description: str,
     duration: float,
     width: int,
-    height: int
+    height: int,
+    loop: bool = False
 ) -> str:
     """Build the user prompt for shader generation."""
+    if loop:
+        timing_instruction = f"""- Duration: {duration} seconds (iTime goes from 0 to {duration})
+- LOOPING: This effect should seamlessly loop! The end state (t={duration}) must smoothly connect back to the start state (t=0). Use cyclic functions like sin/cos with periods that divide evenly into the duration."""
+    else:
+        timing_instruction = f"""- Duration: {duration} seconds (iTime goes from 0 to {duration})
+- NON-LOOPING: This is a one-shot effect that must COMPLETE within the duration. The effect should:
+  - Start at t=0 (can fade in)
+  - Reach its peak/climax around the middle
+  - Fully dissipate/fade out to completely transparent (alpha=0 everywhere) by t={duration}
+  - At the final frame, NOTHING should be visible - the effect is DONE"""
+
     return f"""Create a visual effect animation: "{effect_description}"
 
 Specifications:
-- Duration: {duration} seconds (iTime goes from 0 to {duration})
+{timing_instruction}
 - Resolution: {width} x {height} pixels
 - Output: Transparent background (alpha = 0 where no effect)
 - IMPORTANT: The effect must fit ENTIRELY within the frame bounds at all times. Nothing should be cut off at the edges!
@@ -81,7 +93,8 @@ Please:
 1. Write the shader code (center the effect, add margins to keep it within bounds)
 2. Compile it to check for errors
 3. Render test frames at t=0, t=middle, t=end to verify it looks correct AND fits within frame
-4. Render the final animation when satisfied
+4. For non-looping effects, verify the FINAL frame is completely transparent!
+5. Render the final animation when satisfied
 
 Begin by writing the shader code for this effect."""
 
@@ -93,7 +106,8 @@ async def generate_vfx(
     frames: int = 10,
     output_path: str = "output.gif",
     max_retries: int = 3,
-    verbose: bool = False
+    verbose: bool = False,
+    loop: bool = False
 ) -> Dict[str, Any]:
     """
     Generate a visual effect animation using Claude.
@@ -106,6 +120,7 @@ async def generate_vfx(
         output_path: Path to save the output GIF
         max_retries: Maximum retry attempts if generation fails
         verbose: Print progress messages
+        loop: If True, create a seamlessly looping effect; if False, effect dissipates by end
 
     Returns:
         Dictionary with:
@@ -131,7 +146,7 @@ async def generate_vfx(
     shader_server, allowed_tools = create_shader_tools()
 
     # Build the prompt
-    user_prompt = build_prompt(prompt, duration, width, height)
+    user_prompt = build_prompt(prompt, duration, width, height, loop=loop)
 
     # Configure the agent
     options = ClaudeAgentOptions(
