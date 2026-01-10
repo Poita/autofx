@@ -72,7 +72,13 @@ def build_prompt(
     """Build the user prompt for shader generation."""
     if loop:
         timing_instruction = f"""- Duration: {duration} seconds (iTime goes from 0 to {duration})
-- LOOPING: This effect should seamlessly loop! The end state (t={duration}) must smoothly connect back to the start state (t=0). Use cyclic functions like sin/cos with periods that divide evenly into the duration."""
+- LOOPING: This effect MUST seamlessly loop! Requirements:
+  - The FINAL frame (t={duration}) must be IDENTICAL to the FIRST frame (t=0)
+  - ALL animated values must use cyclic functions (sin, cos, fract)
+  - Use this pattern: sin(iTime * 2.0 * 3.14159 / {duration}) to complete exactly one cycle
+  - Or use: fract(iTime / {duration}) for linear cycling values
+  - EVERY time-based variable must cycle back to its starting value
+  - Test by comparing t=0 and t={duration} frames - they should look identical!"""
     else:
         timing_instruction = f"""- Duration: {duration} seconds (iTime goes from 0 to {duration})
 - NON-LOOPING: This is a one-shot effect that must COMPLETE within the duration. The effect should:
@@ -93,7 +99,9 @@ Please:
 1. Write the shader code (center the effect, add margins to keep it within bounds)
 2. Compile it to check for errors
 3. Render test frames at t=0, t=middle, t=end to verify it looks correct AND fits within frame
-4. For non-looping effects, verify the FINAL frame is completely transparent!
+4. CRITICAL VERIFICATION:
+   - For NON-LOOPING effects: verify the FINAL frame is completely transparent (nothing visible)
+   - For LOOPING effects: verify t=0 and t=end frames are IDENTICAL (compare them carefully!)
 5. Render the final animation when satisfied
 
 Begin by writing the shader code for this effect."""
