@@ -16,7 +16,7 @@ from .tools import create_shader_tools, set_render_context, get_render_context
 MAX_TURNS = 10
 
 # Model to use for shader generation
-MODEL = "claude-opus-4-5-20250514"
+MODEL = "claude-opus-4-5-20251101"
 
 # System prompt for the shader generation agent
 SYSTEM_PROMPT = """You are an expert GLSL shader programmer specializing in Shadertoy-style visual effects.
