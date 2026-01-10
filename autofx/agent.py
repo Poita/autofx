@@ -15,6 +15,9 @@ from .tools import create_shader_tools, set_render_context, get_render_context
 # Maximum number of agent turns before giving up
 MAX_TURNS = 10
 
+# Model to use for shader generation
+MODEL = "claude-opus-4-5-20250514"
+
 # System prompt for the shader generation agent
 SYSTEM_PROMPT = """You are an expert GLSL shader programmer specializing in Shadertoy-style visual effects.
 
@@ -47,11 +50,13 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 4. **Performance**: Keep shaders efficient - avoid excessive loops or complex operations.
 
+5. **CRITICAL - Frame Bounds**: The ENTIRE effect must fit fully within the frame at ALL times during the animation. Use normalized UV coordinates (0.0 to 1.0) and ensure no part of the effect extends beyond the edges. Add padding/margins if needed (e.g., keep effects within 0.1 to 0.9 range). Check your test frames carefully to verify nothing is cut off!
+
 ## Workflow
 
 1. First, write your shader code and use `compile_shader` to check for errors
 2. Use `render_frame` to see the result at different time values (e.g., 0.0, 0.5, 1.0)
-3. Iterate on the shader until the effect looks good
+3. Iterate on the shader until the effect looks good AND fits fully within frame
 4. Finally, use `render_animation` to save the complete animation
 
 Always test your shader before declaring it complete!"""
@@ -70,11 +75,12 @@ Specifications:
 - Duration: {duration} seconds (iTime goes from 0 to {duration})
 - Resolution: {width} x {height} pixels
 - Output: Transparent background (alpha = 0 where no effect)
+- IMPORTANT: The effect must fit ENTIRELY within the frame bounds at all times. Nothing should be cut off at the edges!
 
 Please:
-1. Write the shader code
+1. Write the shader code (center the effect, add margins to keep it within bounds)
 2. Compile it to check for errors
-3. Render a few test frames to verify it looks correct
+3. Render test frames at t=0, t=middle, t=end to verify it looks correct AND fits within frame
 4. Render the final animation when satisfied
 
 Begin by writing the shader code for this effect."""
@@ -129,6 +135,7 @@ async def generate_vfx(
 
     # Configure the agent
     options = ClaudeAgentOptions(
+        model=MODEL,
         mcp_servers={"shader-tools": shader_server},
         allowed_tools=allowed_tools,
         max_turns=MAX_TURNS,
