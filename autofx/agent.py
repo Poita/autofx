@@ -48,7 +48,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 3. **Coordinate System**: fragCoord goes from (0,0) at bottom-left to (iResolution.xy) at top-right. Normalize with: `vec2 uv = fragCoord / iResolution.xy;`
 
-4. **Performance**: Keep shaders efficient - avoid excessive loops or complex operations.
+4. **HIGH QUALITY - Performance is NOT a concern**: This is pre-rendered offline, NOT real-time. Go all out on quality! Use complex noise functions (FBM, Perlin, Simplex), multiple layers, many particles, ray marching, whatever produces the best visual result. Don't hold back - more iterations, more detail, more sophistication. Production quality is the goal.
 
 5. **CRITICAL - Frame Bounds**: The ENTIRE effect must fit fully within the frame at ALL times during the animation. Use normalized UV coordinates (0.0 to 1.0) and ensure no part of the effect extends beyond the edges. Add padding/margins if needed (e.g., keep effects within 0.1 to 0.9 range). Check your test frames carefully to verify nothing is cut off!
 
