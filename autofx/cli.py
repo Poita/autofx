@@ -198,6 +198,13 @@ The .glsl file includes comments with the original command and a render command.
         help="Number of variations to generate with different random seeds (default: 1)"
     )
 
+    parser.add_argument(
+        "-m", "--model",
+        type=str,
+        default=None,
+        help="Model to use for generation (default: claude-opus-4-5-20251101)"
+    )
+
     return parser
 
 
@@ -219,6 +226,8 @@ async def run_async(args: argparse.Namespace) -> int:
     print(f"  Mode: {'looping' if args.loop else 'one-shot (dissipates)'}")
     if args.variations > 1:
         print(f"  Variations: {args.variations}")
+    if args.model:
+        print(f"  Model: {args.model}")
     print(f"  Output: {output_path}")
     if args.spritesheet:
         cols, rows = get_spritesheet_layout(args.frames, args.rows)
@@ -234,7 +243,8 @@ async def run_async(args: argparse.Namespace) -> int:
             output_path=output_path,
             verbose=args.verbose,
             loop=args.loop,
-            variations=args.variations
+            variations=args.variations,
+            model=args.model
         )
 
         if result["success"]:

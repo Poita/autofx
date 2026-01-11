@@ -12,8 +12,8 @@ from pathlib import Path
 from .tools import create_shader_tools, set_render_context, get_render_context
 
 
-# Model to use for shader generation
-MODEL = "claude-opus-4-5-20251101"
+# Default model for shader generation
+DEFAULT_MODEL = "claude-opus-4-5-20251101"
 
 # System prompt for the shader generation agent
 SYSTEM_PROMPT = """You are an expert GLSL shader programmer specializing in Shadertoy-style visual effects.
@@ -131,7 +131,8 @@ async def generate_vfx(
     output_path: str = "output.gif",
     verbose: bool = False,
     loop: bool = False,
-    variations: int = 1
+    variations: int = 1,
+    model: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Generate a visual effect animation using Claude.
@@ -145,6 +146,7 @@ async def generate_vfx(
         verbose: Print progress messages
         loop: If True, create a seamlessly looping effect; if False, effect dissipates by end
         variations: Number of variations to generate (tells agent to use iSeed if > 1)
+        model: Model to use (default: claude-opus-4-5-20251101)
 
     Returns:
         Dictionary with:
@@ -174,7 +176,7 @@ async def generate_vfx(
 
     # Configure the agent (no max_turns - let it work until done)
     options = ClaudeAgentOptions(
-        model=MODEL,
+        model=model or DEFAULT_MODEL,
         mcp_servers={"shader-tools": shader_server},
         allowed_tools=allowed_tools,
         system_prompt=SYSTEM_PROMPT,
