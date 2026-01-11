@@ -34,6 +34,14 @@ autofx "healing aura effect, soft green particles rising upward, gentle golden s
 
 # Sprite sheet with specific layout
 autofx "spinning gold coin with shine glint, metallic reflections" --loop -f 8 -s --rows 1 -o coin.gif
+
+# Multiple variations with different seeds
+autofx "particle explosion with random sparks" -n 3 -o explosion.gif
+# Produces: explosion-0.gif, explosion-1.gif, explosion-2.gif
+
+# Re-render existing shader (no AI, just render)
+autofx explosion.glsl -r 512x512 -f 60 -o explosion_hd.gif
+autofx explosion.glsl -s -o explosion.gif  # Generate sprite sheet
 ```
 
 **Prompt tips:**
@@ -47,7 +55,7 @@ autofx "spinning gold coin with shine glint, metallic reflections" --loop -f 8 -
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `prompt` | | required | Effect description (e.g., "fiery explosion") |
+| `prompt` | | required | Effect description, or `.glsl` file to render |
 | `--duration` | `-d` | 1.0 | Animation duration in seconds |
 | `--resolution` | `-r` | 256x256 | Output resolution (WxH) |
 | `--frames` | `-f` | 10 | Number of frames (use 30-60 for smooth animation) |
@@ -55,15 +63,19 @@ autofx "spinning gold coin with shine glint, metallic reflections" --loop -f 8 -
 | `--loop` | `-l` | false | Seamlessly looping effect |
 | `--spritesheet` | `-s` | false | Also output PNG sprite sheet |
 | `--rows` | | auto | Rows in sprite sheet |
+| `--variations` | `-n` | 1 | Generate N variations with different seeds |
+| `--model` | `-m` | opus | Model override (e.g., `claude-sonnet-4-20250514`) |
 | `--verbose` | `-v` | false | Show full agent output |
 
 ## Output Files
 
 Running `autofx "effect" -o effect.gif` produces:
 - `effect.gif` - Animated GIF with transparency
-- `effect.glsl` - Generated shader source code
+- `effect.glsl` - Shader source (includes re-render command in comments)
 
 With `-s`: also produces `effect.png` sprite sheet.
+
+With `-n 3`: produces `effect-0.gif`, `effect-1.gif`, `effect-2.gif` + one `effect.glsl`.
 
 ## Tips
 
@@ -72,6 +84,8 @@ With `-s`: also produces `effect.png` sprite sheet.
 3. **For one-shot effects**: Default mode - explosions, impacts, spell casts
 4. **Higher quality**: Use more frames (`-f 60`) - rendering is offline
 5. **Edit shaders**: The `.glsl` file can be manually edited and re-rendered
+6. **Variations**: Use `-n 3` for effects with randomness to get multiple unique outputs
+7. **Re-render**: Pass a `.glsl` file to render at different settings without AI
 
 ## Python API
 
@@ -85,11 +99,13 @@ result = await generate_vfx(
     resolution=(256, 256),
     frames=30,
     output_path="explosion.gif",
-    loop=False
+    loop=False,
+    variations=1,          # N variations with different seeds
+    model=None             # Override model
 )
 
 # Low-level (render existing shader)
-frames = render_shader(shader_code, duration=1.0, resolution=(256, 256), num_frames=30)
+frames = render_shader(shader_code, duration=1.0, resolution=(256, 256), num_frames=30, seed=0.0)
 save_gif(frames, "output.gif", duration=1.0)
 ```
 
