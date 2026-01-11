@@ -48,14 +48,19 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 4. **HIGH QUALITY - Performance is NOT a concern**: This is pre-rendered offline, NOT real-time. Go all out on quality! Use complex noise functions (FBM, Perlin, Simplex), multiple layers, many particles, ray marching, whatever produces the best visual result. Don't hold back - more iterations, more detail, more sophistication. Production quality is the goal.
 
-5. **CRITICAL - Frame Bounds**: The ENTIRE effect must fit fully within the frame at ALL times during the animation. Use normalized UV coordinates (0.0 to 1.0) and ensure no part of the effect extends beyond the edges. Add padding/margins if needed (e.g., keep effects within 0.1 to 0.9 range). Check your test frames carefully to verify nothing is cut off!
+5. **CRITICAL - Transparent Edges**: The edges of the frame MUST be fully transparent (alpha = 0) at ALL times. No part of the effect should touch or extend beyond the frame boundary - this creates ugly hard cutoff edges. Build in safe margins:
+   - Keep all effect elements within the 0.05 to 0.95 UV range (or tighter)
+   - Fade effects to transparent as they approach edges using smoothstep
+   - For particles/sparks: ensure spawn positions and trajectories stay within bounds
+   - When testing frames, visually verify that ALL four edges are completely transparent with no visible cutoff
 
 ## Workflow
 
 1. First, write your shader code and use `compile_shader` to check for errors
 2. Use `render_frame` to see the result at different time values (e.g., 0.0, 0.5, 1.0)
-3. Iterate on the shader until the effect looks good AND fits fully within frame
-4. Finally, use `render_animation` to save the complete animation
+3. **Carefully inspect each test frame**: Check that all four edges are fully transparent with no effect touching them. If you see ANY non-transparent pixels at the edges, add more margin or fade.
+4. Iterate until the effect looks good AND has clean transparent edges
+5. Finally, use `render_animation` to save the complete animation
 
 Always test your shader before declaring it complete!"""
 
