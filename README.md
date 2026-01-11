@@ -4,26 +4,12 @@ AI-powered visual effects animation generator for games. Describe an effect in p
 
 ## Examples
 
-<table>
-<tr>
-<td align="center">
-<img src="examples/explosion.gif" width="128" height="128" alt="Explosion"><br>
-<sub>Explosion (one-shot)</sub>
-</td>
-<td align="center">
-<img src="examples/magic-flames.gif" width="128" height="128" alt="Magic Flames"><br>
-<sub>Magic Flames (looping)</sub>
-</td>
-<td align="center">
-<img src="examples/energy-ball.gif" width="128" height="128" alt="Energy Ball"><br>
-<sub>Energy Ball (looping)</sub>
-</td>
-<td align="center">
-<img src="examples/heal.gif" width="128" height="128" alt="Heal"><br>
-<sub>Heal Aura (looping)</sub>
-</td>
-</tr>
-</table>
+| Command | Output |
+|---------|--------|
+| `autofx "fiery explosion" -f 30 -o explosion.gif` | <img src="examples/explosion.gif" width="128"> |
+| `autofx "mystical purple flames" --loop -d 1.5 -f 45 -o magic-flames.gif` | <img src="examples/magic-flames.gif" width="128"> |
+| `autofx "glowing energy ball" --loop -f 30 -o energy-ball.gif` | <img src="examples/energy-ball.gif" width="128"> |
+| `autofx "healing aura with rising particles" --loop -f 60 -o heal.gif` | <img src="examples/heal.gif" width="128"> |
 
 ## How It Works
 
@@ -74,23 +60,32 @@ autofx "energy ball" -f 16 -s -o energy.gif
 # Sprite sheet with specific row count
 autofx "coin spin" --loop -f 8 -s --rows 1 -o coin.gif
 
-# Verbose mode for debugging
-autofx "portal vortex" -v -o portal.gif
+# Multiple variations with different seeds
+autofx "particle burst" -n 3 -o burst.gif
+# Output: burst-0.gif, burst-1.gif, burst-2.gif, burst.glsl
+
+# Re-render existing shader at different settings
+autofx explosion.glsl -r 512x512 -f 60 -o explosion_hd.gif
+
+# Generate sprite sheet from existing shader
+autofx explosion.glsl -s -f 16 -o explosion.gif
 ```
 
 ### Options
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `prompt` | | (required) | Description of the visual effect |
+| `prompt` | | (required) | Effect description, or `.glsl` file to render |
 | `--duration` | `-d` | 1.0 | Animation duration in seconds |
 | `--resolution` | `-r` | 256x256 | Output resolution (WxH) |
 | `--frames` | `-f` | 10 | Number of frames |
 | `--output` | `-o` | output.gif | Output file path |
-| `--verbose` | `-v` | false | Print detailed progress |
-| `--loop` | `-l` | false | Create seamlessly looping effect (default: one-shot that dissipates) |
+| `--loop` | `-l` | false | Seamlessly looping effect |
 | `--spritesheet` | `-s` | false | Also output a PNG sprite sheet |
-| `--rows` | | auto | Number of rows in sprite sheet (auto-calculated if not specified) |
+| `--rows` | | auto | Rows in sprite sheet |
+| `--variations` | `-n` | 1 | Generate N variations with different seeds |
+| `--model` | `-m` | opus | Model to use for generation |
+| `--verbose` | `-v` | false | Print detailed progress |
 
 ## Library Usage
 
@@ -203,6 +198,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 |---------|------|-------------|
 | `iTime` | float | Current time in seconds (0 to duration) |
 | `iResolution` | vec3 | Viewport resolution (width, height, 1.0) |
+| `iSeed` | float | Random seed for variations (use with `-n`) |
 
 ### Transparency
 
@@ -223,16 +219,14 @@ fragColor = vec4(color, 0.5);
 
 When you run `autofx "effect" -o effect.gif`, you get:
 
-- `effect.gif` - The animated GIF with transparent background
-- `effect.glsl` - The generated shader source code
+- `effect.gif` - Animated GIF with transparent background
+- `effect.glsl` - Shader source code (includes re-render command in comments)
 
-With `-s/--spritesheet`, you also get:
-- `effect.png` - PNG sprite sheet with all frames in a grid
+With `-s/--spritesheet`: also `effect.png` sprite sheet.
 
-The shader file lets you:
-- Modify and re-render the effect
-- Learn from the generated code
-- Use the shader in your own projects
+With `-n 3`: produces `effect-0.gif`, `effect-1.gif`, `effect-2.gif` + one `effect.glsl`.
+
+The `.glsl` file can be re-rendered at any time: `autofx effect.glsl -r 512x512 -o effect_hd.gif`
 
 ## Requirements
 
