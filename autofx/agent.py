@@ -36,6 +36,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 - `iTime` (float): Current time in seconds (0 to duration)
 - `iResolution` (vec3): Viewport resolution (width, height, 1.0)
+- `iSeed` (float): Random seed for procedural variation (used when generating multiple variations)
 
 ## Important Guidelines
 
@@ -64,7 +65,8 @@ def build_prompt(
     duration: float,
     width: int,
     height: int,
-    loop: bool = False
+    loop: bool = False,
+    variations: int = 1
 ) -> str:
     """Build the user prompt for shader generation."""
     if loop:
@@ -84,10 +86,27 @@ def build_prompt(
   - Fully dissipate/fade out to completely transparent (alpha=0 everywhere) by t={duration}
   - At the final frame, NOTHING should be visible - the effect is DONE"""
 
+    # Add variations instruction if generating multiple variations
+    if variations > 1:
+        variations_instruction = f"""
+- VARIATIONS: You are generating a shader that will be rendered {variations} times with different seeds.
+  You MUST incorporate `iSeed` into any randomness in your shader (noise functions, hash functions,
+  random particle positions, etc.). The same shader code will produce {variations} unique-looking
+  animations by varying iSeed from 0 to {variations - 1}.
+
+  Example patterns:
+  - `hash(fragCoord + iSeed)` instead of `hash(fragCoord)`
+  - `noise(uv * 10.0 + iSeed)` instead of `noise(uv * 10.0)`
+  - `sin(iTime + iSeed * 6.28)` for phase-shifted animations
+
+  Your effect MUST look different for each seed value while maintaining the same overall style."""
+    else:
+        variations_instruction = ""
+
     return f"""Create a visual effect animation: "{effect_description}"
 
 Specifications:
-{timing_instruction}
+{timing_instruction}{variations_instruction}
 - Resolution: {width} x {height} pixels
 - Output: Transparent background (alpha = 0 where no effect)
 - IMPORTANT: The effect must fit ENTIRELY within the frame bounds at all times. Nothing should be cut off at the edges!
@@ -111,7 +130,8 @@ async def generate_vfx(
     frames: int = 10,
     output_path: str = "output.gif",
     verbose: bool = False,
-    loop: bool = False
+    loop: bool = False,
+    variations: int = 1
 ) -> Dict[str, Any]:
     """
     Generate a visual effect animation using Claude.
@@ -124,6 +144,7 @@ async def generate_vfx(
         output_path: Path to save the output GIF
         verbose: Print progress messages
         loop: If True, create a seamlessly looping effect; if False, effect dissipates by end
+        variations: Number of variations to generate (tells agent to use iSeed if > 1)
 
     Returns:
         Dictionary with:
@@ -149,7 +170,7 @@ async def generate_vfx(
     shader_server, allowed_tools = create_shader_tools()
 
     # Build the prompt
-    user_prompt = build_prompt(prompt, duration, width, height, loop=loop)
+    user_prompt = build_prompt(prompt, duration, width, height, loop=loop, variations=variations)
 
     # Configure the agent (no max_turns - let it work until done)
     options = ClaudeAgentOptions(

@@ -25,7 +25,8 @@ def set_render_context(
     height: int,
     duration: float,
     num_frames: int,
-    output_path: str
+    output_path: str,
+    seed: float = 0.0
 ) -> None:
     """
     Set the rendering context for tools to use.
@@ -39,6 +40,7 @@ def set_render_context(
         "duration": duration,
         "num_frames": num_frames,
         "output_path": output_path,
+        "seed": seed,
         "shader_code": None,
     }
 
@@ -105,7 +107,7 @@ def create_shader_tools():
 
         try:
             with ShaderRenderer(ctx["width"], ctx["height"]) as renderer:
-                frame = renderer.render(shader_code, time)
+                frame = renderer.render(shader_code, time, ctx.get("seed", 0.0))
 
                 # Convert to base64 PNG
                 png_base64 = frame_to_base64_png(frame)
@@ -149,7 +151,8 @@ def create_shader_tools():
                 frames = renderer.render_animation(
                     shader_code,
                     ctx["duration"],
-                    ctx["num_frames"]
+                    ctx["num_frames"],
+                    ctx.get("seed", 0.0)
                 )
 
                 # Save the GIF

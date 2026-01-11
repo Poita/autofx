@@ -38,6 +38,7 @@ FRAGMENT_SHADER_TEMPLATE = """
 
 uniform float iTime;
 uniform vec3 iResolution;
+uniform float iSeed;
 
 out vec4 fragColor;
 
@@ -126,13 +127,14 @@ class ShaderRenderer:
             # Try to extract useful error info
             return False, error_msg
 
-    def render(self, shader_code: str, time: float) -> Image.Image:
+    def render(self, shader_code: str, time: float, seed: float = 0.0) -> Image.Image:
         """
         Render the shader at a specific time value.
 
         Args:
             shader_code: The user's shader code containing mainImage function
             time: The iTime value to use (seconds)
+            seed: The iSeed value for procedural variation (default: 0.0)
 
         Returns:
             PIL Image in RGBA mode
@@ -155,6 +157,8 @@ class ShaderRenderer:
                 float(self.height),
                 1.0  # pixel aspect ratio
             )
+        if 'iSeed' in self.program:
+            self.program['iSeed'].value = seed
 
         # Render to framebuffer
         self.fbo.use()
@@ -174,7 +178,8 @@ class ShaderRenderer:
         self,
         shader_code: str,
         duration: float,
-        num_frames: int
+        num_frames: int,
+        seed: float = 0.0
     ) -> List[Image.Image]:
         """
         Render an animation as a sequence of frames.
@@ -183,6 +188,7 @@ class ShaderRenderer:
             shader_code: The user's shader code containing mainImage function
             duration: Total animation duration in seconds
             num_frames: Number of frames to render
+            seed: The iSeed value for procedural variation (default: 0.0)
 
         Returns:
             List of PIL Images in RGBA mode
@@ -199,7 +205,7 @@ class ShaderRenderer:
             time = (i / max(num_frames - 1, 1)) * duration
 
             # Render the frame (shader already compiled)
-            frame = self.render(shader_code, time)
+            frame = self.render(shader_code, time, seed)
             frames.append(frame)
 
         return frames
@@ -229,7 +235,8 @@ def render_shader(
     shader_code: str,
     duration: float,
     resolution: Tuple[int, int],
-    num_frames: int
+    num_frames: int,
+    seed: float = 0.0
 ) -> List[Image.Image]:
     """
     Convenience function to render a shader animation.
@@ -239,6 +246,7 @@ def render_shader(
         duration: Animation duration in seconds
         resolution: (width, height) tuple
         num_frames: Number of frames to generate
+        seed: The iSeed value for procedural variation (default: 0.0)
 
     Returns:
         List of PIL Images in RGBA mode
@@ -246,7 +254,7 @@ def render_shader(
     width, height = resolution
 
     with ShaderRenderer(width, height) as renderer:
-        return renderer.render_animation(shader_code, duration, num_frames)
+        return renderer.render_animation(shader_code, duration, num_frames, seed)
 
 
 def compile_shader(shader_code: str, width: int = 256, height: int = 256) -> Tuple[bool, Optional[str]]:

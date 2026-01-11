@@ -117,13 +117,20 @@ With -s/--spritesheet, a PNG sprite sheet is also saved (e.g., explosion.png).
         help="Number of rows in sprite sheet (default: auto-calculated for square-ish layout)"
     )
 
+    parser.add_argument(
+        "-n", "--variations",
+        type=int,
+        default=1,
+        help="Number of variations to generate with different random seeds (default: 1)"
+    )
+
     return parser
 
 
 async def run_async(args: argparse.Namespace) -> int:
     """Run the VFX generation asynchronously."""
     from .agent import generate_vfx
-    from .gif import save_spritesheet, get_spritesheet_layout
+    from .gif import save_gif, save_spritesheet, get_spritesheet_layout
     from .renderer import render_shader
 
     # Ensure output path has .gif extension
@@ -136,6 +143,8 @@ async def run_async(args: argparse.Namespace) -> int:
     print(f"  Duration: {args.duration}s")
     print(f"  Frames: {args.frames}")
     print(f"  Mode: {'looping' if args.loop else 'one-shot (dissipates)'}")
+    if args.variations > 1:
+        print(f"  Variations: {args.variations}")
     print(f"  Output: {output_path}")
     if args.spritesheet:
         cols, rows = get_spritesheet_layout(args.frames, args.rows)
@@ -150,32 +159,86 @@ async def run_async(args: argparse.Namespace) -> int:
             frames=args.frames,
             output_path=output_path,
             verbose=args.verbose,
-            loop=args.loop
+            loop=args.loop,
+            variations=args.variations
         )
 
         if result["success"]:
             print()
             print("Success!")
-            print(f"  GIF: {result['gif_path']}")
-            print(f"  Shader: {result['shader_path']}")
 
-            # Generate sprite sheet if requested
-            if args.spritesheet and result.get("shader_code"):
-                spritesheet_path = Path(output_path).with_suffix('.png')
-                print(f"  Generating sprite sheet...")
+            shader_code = result.get("shader_code")
+            output_base = Path(output_path)
 
-                # Re-render frames for the sprite sheet
-                frames = render_shader(
-                    shader_code=result["shader_code"],
-                    duration=args.duration,
-                    resolution=args.resolution,
-                    num_frames=args.frames
-                )
+            if args.variations > 1 and shader_code:
+                # Multiple variations: rename original and render additional variations
+                import os
 
-                cols, rows = save_spritesheet(frames, str(spritesheet_path), args.rows)
-                sheet_width = cols * args.resolution[0]
-                sheet_height = rows * args.resolution[1]
-                print(f"  Sprite sheet: {spritesheet_path} ({sheet_width}x{sheet_height}, {cols}x{rows} grid)")
+                # Rename the original GIF (seed 0) to include -0 suffix
+                original_gif = output_base
+                variation_gif = output_base.with_stem(f"{output_base.stem}-0")
+                if original_gif.exists():
+                    os.rename(original_gif, variation_gif)
+                print(f"  GIF: {variation_gif}")
+
+                # Generate sprite sheet for variation 0 if requested
+                if args.spritesheet:
+                    spritesheet_path = variation_gif.with_suffix('.png')
+                    frames = render_shader(
+                        shader_code=shader_code,
+                        duration=args.duration,
+                        resolution=args.resolution,
+                        num_frames=args.frames,
+                        seed=0.0
+                    )
+                    cols, rows = save_spritesheet(frames, str(spritesheet_path), args.rows)
+                    print(f"  Sprite sheet: {spritesheet_path}")
+
+                # Render additional variations with different seeds
+                for i in range(1, args.variations):
+                    variation_gif = output_base.with_stem(f"{output_base.stem}-{i}")
+                    print(f"  Rendering variation {i}...")
+
+                    frames = render_shader(
+                        shader_code=shader_code,
+                        duration=args.duration,
+                        resolution=args.resolution,
+                        num_frames=args.frames,
+                        seed=float(i)
+                    )
+
+                    save_gif(frames, str(variation_gif), args.duration)
+                    print(f"  GIF: {variation_gif}")
+
+                    # Generate sprite sheet for this variation if requested
+                    if args.spritesheet:
+                        spritesheet_path = variation_gif.with_suffix('.png')
+                        cols, rows = save_spritesheet(frames, str(spritesheet_path), args.rows)
+                        print(f"  Sprite sheet: {spritesheet_path}")
+
+                # Shader is saved once without suffix
+                print(f"  Shader: {result['shader_path']}")
+            else:
+                # Single variation: keep original behavior
+                print(f"  GIF: {result['gif_path']}")
+                print(f"  Shader: {result['shader_path']}")
+
+                # Generate sprite sheet if requested
+                if args.spritesheet and shader_code:
+                    spritesheet_path = Path(output_path).with_suffix('.png')
+                    print(f"  Generating sprite sheet...")
+
+                    frames = render_shader(
+                        shader_code=shader_code,
+                        duration=args.duration,
+                        resolution=args.resolution,
+                        num_frames=args.frames
+                    )
+
+                    cols, rows = save_spritesheet(frames, str(spritesheet_path), args.rows)
+                    sheet_width = cols * args.resolution[0]
+                    sheet_height = rows * args.resolution[1]
+                    print(f"  Sprite sheet: {spritesheet_path} ({sheet_width}x{sheet_height}, {cols}x{rows} grid)")
 
             return 0
         else:
