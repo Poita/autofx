@@ -10,6 +10,7 @@ AI-powered visual effects animation generator for games. Describe an effect in p
 | `autofx "mystical purple flames" --loop -d 1.5 -f 45 -o magic-flames.gif` | <img src="examples/magic-flames.gif" width="128"> |
 | `autofx "glowing energy ball" --loop -f 30 -o energy-ball.gif` | <img src="examples/energy-ball.gif" width="128"> |
 | `autofx "healing aura with rising particles" --loop -f 60 -o heal.gif` | <img src="examples/heal.gif" width="128"> |
+| `autofx --edit magic-flames.glsl "make it blue" ...` | <img src="examples/blue-flames.gif" width="128"> |
 
 ## How It Works
 
@@ -69,6 +70,9 @@ autofx explosion.glsl -r 512x512 -f 60 -o explosion_hd.gif
 
 # Generate sprite sheet from existing shader
 autofx explosion.glsl -s -f 16 -o explosion.gif
+
+# Edit an existing shader with AI
+autofx --edit magic-flames.glsl "make the flames blue instead" --loop -d 1.5 -f 45 -o blue-flames.gif
 ```
 
 ### Options
@@ -85,6 +89,7 @@ autofx explosion.glsl -s -f 16 -o explosion.gif
 | `--rows` | | auto | Rows in sprite sheet |
 | `--variations` | `-n` | 1 | Generate N variations with different seeds |
 | `--model` | `-m` | opus | Model to use for generation |
+| `--edit` | `-e` | | Edit existing `.glsl` file (prompt becomes modification) |
 | `--verbose` | `-v` | false | Print detailed progress |
 
 ### Variations Example

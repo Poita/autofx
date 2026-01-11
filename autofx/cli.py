@@ -205,6 +205,14 @@ The .glsl file includes comments with the original command and a render command.
         help="Model to use for generation (default: claude-opus-4-5-20251101)"
     )
 
+    parser.add_argument(
+        "-e", "--edit",
+        type=str,
+        metavar="GLSL_FILE",
+        default=None,
+        help="Edit an existing shader with the given modification prompt"
+    )
+
     return parser
 
 
@@ -441,6 +449,120 @@ def render_from_glsl(args: argparse.Namespace) -> int:
         return 1
 
 
+async def run_edit_async(args: argparse.Namespace) -> int:
+    """Run the VFX editing asynchronously."""
+    from .agent import edit_vfx
+    from .gif import save_gif, save_spritesheet, get_spritesheet_layout
+    from .renderer import render_shader
+
+    # Read the existing shader
+    shader_path = Path(args.edit)
+    if not shader_path.exists():
+        print(f"Error: Shader file not found: {shader_path}")
+        return 1
+
+    existing_shader = shader_path.read_text()
+    existing_shader = strip_glsl_header(existing_shader)
+
+    # Ensure output path has .gif extension
+    output_path = args.output
+    if not output_path.lower().endswith('.gif'):
+        output_path += '.gif'
+
+    print(f"Editing shader: {shader_path}")
+    print(f"  Modification: {args.prompt}")
+    print(f"  Resolution: {args.resolution[0]}x{args.resolution[1]}")
+    print(f"  Duration: {args.duration}s")
+    print(f"  Frames: {args.frames}")
+    print(f"  Mode: {'looping' if args.loop else 'one-shot (dissipates)'}")
+    if args.model:
+        print(f"  Model: {args.model}")
+    print(f"  Output: {output_path}")
+    if args.spritesheet:
+        cols, rows = get_spritesheet_layout(args.frames, args.rows)
+        print(f"  Sprite sheet: {cols}x{rows} grid")
+    print()
+
+    try:
+        result = await edit_vfx(
+            existing_shader=existing_shader,
+            modification=args.prompt,
+            duration=args.duration,
+            resolution=args.resolution,
+            frames=args.frames,
+            output_path=output_path,
+            verbose=args.verbose,
+            loop=args.loop,
+            model=args.model
+        )
+
+        if result["success"]:
+            print()
+            print("Success!")
+
+            shader_code = result.get("shader_code")
+            output_base = Path(output_path)
+
+            print(f"  GIF: {result['gif_path']}")
+            print(f"  Shader: {result['shader_path']}")
+
+            # Generate sprite sheet if requested
+            if args.spritesheet and shader_code:
+                spritesheet_path = Path(output_path).with_suffix('.png')
+                print(f"  Generating sprite sheet...")
+
+                frames = render_shader(
+                    shader_code=shader_code,
+                    duration=args.duration,
+                    resolution=args.resolution,
+                    num_frames=args.frames
+                )
+
+                cols, rows = save_spritesheet(frames, str(spritesheet_path), args.rows)
+                sheet_width = cols * args.resolution[0]
+                sheet_height = rows * args.resolution[1]
+                print(f"  Sprite sheet: {spritesheet_path} ({sheet_width}x{sheet_height}, {cols}x{rows} grid)")
+
+            # Re-save shader with header comments
+            new_shader_path = Path(output_path).with_suffix('.glsl')
+            if shader_code and new_shader_path.exists():
+                # For edit mode, use a modified generate command format
+                generate_cmd = f"autofx --edit {shlex.quote(str(shader_path))} {shlex.quote(args.prompt)}"
+                if args.duration != 1.0:
+                    generate_cmd += f" -d {args.duration}"
+                if args.resolution != (256, 256):
+                    generate_cmd += f" -r {args.resolution[0]}x{args.resolution[1]}"
+                if args.frames != 10:
+                    generate_cmd += f" -f {args.frames}"
+                if args.loop:
+                    generate_cmd += " --loop"
+                generate_cmd += f" -o {shlex.quote(args.output)}"
+
+                render_cmd = build_render_command(str(new_shader_path), args)
+                shader_with_header = add_glsl_header(shader_code, generate_cmd, render_cmd)
+                new_shader_path.write_text(shader_with_header)
+
+            return 0
+        else:
+            print()
+            print(f"Error: {result['error']}")
+            return 1
+
+    except ImportError as e:
+        print(f"Error: {e}")
+        print()
+        print("Make sure you have the required dependencies installed:")
+        print("  pip install claude-agent-sdk moderngl pillow numpy")
+        return 1
+
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+
 def main() -> int:
     """Main entry point for the CLI."""
     parser = create_parser()
@@ -458,8 +580,11 @@ def main() -> int:
     if args.frames < 2:
         print("Warning: Using only 1 frame won't produce an animation")
 
-    # Check if input is a .glsl file (render mode) or a prompt (generate mode)
-    if args.prompt.lower().endswith('.glsl'):
+    # Check mode: edit, render, or generate
+    if args.edit:
+        # Edit mode: modify existing shader with AI
+        return asyncio.run(run_edit_async(args))
+    elif args.prompt.lower().endswith('.glsl'):
         # Render mode: read shader and render directly
         return render_from_glsl(args)
     else:

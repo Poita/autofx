@@ -34,7 +34,7 @@ Usage:
 __version__ = "0.1.0"
 
 # High-level API
-from .agent import generate_vfx, generate_vfx_with_feedback
+from .agent import generate_vfx, generate_vfx_with_feedback, edit_vfx
 
 # Low-level rendering API
 from .renderer import (
@@ -57,6 +57,7 @@ __all__ = [
     # High-level API
     "generate_vfx",
     "generate_vfx_with_feedback",
+    "edit_vfx",
     # Low-level API
     "render_shader",
     "compile_shader",

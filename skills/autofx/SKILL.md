@@ -42,6 +42,9 @@ autofx "particle explosion with random sparks" -n 3 -o explosion.gif
 # Re-render existing shader (no AI, just render)
 autofx explosion.glsl -r 512x512 -f 60 -o explosion_hd.gif
 autofx explosion.glsl -s -o explosion.gif  # Generate sprite sheet
+
+# Edit an existing shader with AI
+autofx --edit magic-flames.glsl "make the flames blue instead of purple" --loop -d 1.5 -f 45 -o blue-flames.gif
 ```
 
 **Prompt tips:**
@@ -65,6 +68,7 @@ autofx explosion.glsl -s -o explosion.gif  # Generate sprite sheet
 | `--rows` | | auto | Rows in sprite sheet |
 | `--variations` | `-n` | 1 | Generate N variations with different seeds |
 | `--model` | `-m` | opus | Model override (e.g., `claude-sonnet-4-20250514`) |
+| `--edit` | `-e` | | Edit existing `.glsl` file with AI (prompt becomes modification) |
 | `--verbose` | `-v` | false | Show full agent output |
 
 ## Output Files
@@ -83,14 +87,15 @@ With `-n 3`: produces `effect-0.gif`, `effect-1.gif`, `effect-2.gif` + one `effe
 2. **For looping effects**: Use `--loop` for fire, magic auras, idle animations
 3. **For one-shot effects**: Default mode - explosions, impacts, spell casts
 4. **Higher quality**: Use more frames (`-f 60`) - rendering is offline
-5. **Edit shaders**: The `.glsl` file can be manually edited and re-rendered
-6. **Variations**: Use `-n 3` for effects with randomness to get multiple unique outputs
-7. **Re-render**: Pass a `.glsl` file to render at different settings without AI
+5. **Edit shaders**: Use `--edit shader.glsl "change colors to blue"` to modify with AI
+6. **Manual edit**: The `.glsl` file can also be manually edited and re-rendered
+7. **Variations**: Use `-n 3` for effects with randomness to get multiple unique outputs
+8. **Re-render**: Pass a `.glsl` file to render at different settings without AI
 
 ## Python API
 
 ```python
-from autofx import generate_vfx, render_shader, save_gif
+from autofx import generate_vfx, edit_vfx, render_shader, save_gif
 
 # High-level (uses Claude agent)
 result = await generate_vfx(
@@ -102,6 +107,16 @@ result = await generate_vfx(
     loop=False,
     variations=1,          # N variations with different seeds
     model=None             # Override model
+)
+
+# Edit existing shader with AI
+result = await edit_vfx(
+    existing_shader=open("explosion.glsl").read(),
+    modification="make it blue instead of orange",
+    duration=1.0,
+    resolution=(256, 256),
+    frames=30,
+    output_path="blue-explosion.gif"
 )
 
 # Low-level (render existing shader)

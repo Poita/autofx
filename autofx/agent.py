@@ -64,6 +64,55 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 Always test your shader before declaring it complete!"""
 
+# System prompt for editing existing shaders
+EDIT_SYSTEM_PROMPT = """You are an expert GLSL shader programmer specializing in Shadertoy-style visual effects.
+
+Your task is to MODIFY an existing shader according to the user's instructions while preserving the parts that work well.
+
+## Shader Format Requirements
+
+The shader MUST follow this exact format:
+
+```glsl
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    // Your shader code here
+    // fragCoord: pixel coordinates (0 to iResolution.xy)
+    // fragColor: output color (RGBA, with alpha for transparency)
+}
+```
+
+## Available Uniforms
+
+- `iTime` (float): Current time in seconds (0 to duration)
+- `iResolution` (vec3): Viewport resolution (width, height, 1.0)
+- `iSeed` (float): Random seed for procedural variation
+
+## Important Guidelines
+
+1. **Preserve What Works**: The existing shader already produces a working effect. Make targeted changes to achieve the requested modification without breaking what already works.
+
+2. **Transparency**: Use the alpha channel (fragColor.a) for transparency. Pixels where the effect doesn't appear should have alpha = 0.0.
+
+3. **Animation Timing**: The animation runs from iTime=0 to iTime=duration. Maintain proper timing behavior.
+
+4. **HIGH QUALITY**: This is pre-rendered offline. Maintain or improve quality.
+
+5. **CRITICAL - Transparent Edges**: The edges of the frame MUST be fully transparent (alpha = 0) at ALL times. No part of the effect should touch or extend beyond the frame boundary.
+   - Keep all effect elements within the 0.05 to 0.95 UV range (or tighter)
+   - Fade effects to transparent as they approach edges using smoothstep
+
+## Workflow
+
+1. Study the existing shader to understand its structure
+2. Make the requested modifications
+3. Use `compile_shader` to check for errors
+4. Use `render_frame` to see the result at different time values (e.g., 0.0, 0.5, 1.0)
+5. **Verify**: Check that the modification was successful AND edges are still transparent
+6. Iterate if needed
+7. Finally, use `render_animation` to save the complete animation
+
+Always test your modified shader before declaring it complete!"""
+
 
 def build_prompt(
     effect_description: str,
@@ -128,6 +177,46 @@ Please:
 Begin by writing the shader code for this effect."""
 
 
+def build_edit_prompt(
+    existing_shader: str,
+    modification: str,
+    duration: float,
+    width: int,
+    height: int,
+    loop: bool = False
+) -> str:
+    """Build the user prompt for shader editing."""
+    if loop:
+        timing_instruction = f"""- Duration: {duration} seconds (iTime goes from 0 to {duration})
+- LOOPING: The effect must seamlessly loop (final frame identical to first frame)"""
+    else:
+        timing_instruction = f"""- Duration: {duration} seconds (iTime goes from 0 to {duration})
+- NON-LOOPING: One-shot effect that dissipates to fully transparent by the end"""
+
+    return f"""Modify this shader: "{modification}"
+
+## Existing Shader Code
+
+```glsl
+{existing_shader}
+```
+
+## Requirements
+{timing_instruction}
+- Resolution: {width} x {height} pixels
+- Output: Transparent background (alpha = 0 where no effect)
+- IMPORTANT: Keep edges fully transparent at all times
+
+Please:
+1. Study the existing shader to understand its structure
+2. Make the requested modifications
+3. Compile to check for errors
+4. Render test frames at t=0, t=middle, t=end to verify the modification AND transparent edges
+5. Render the final animation when satisfied
+
+Begin by analyzing the shader and making the requested changes."""
+
+
 async def generate_vfx(
     prompt: str,
     duration: float = 1.0,
@@ -185,6 +274,112 @@ async def generate_vfx(
         mcp_servers={"shader-tools": shader_server},
         allowed_tools=allowed_tools,
         system_prompt=SYSTEM_PROMPT,
+    )
+
+    try:
+        async with ClaudeSDKClient(options=options) as client:
+            await client.query(user_prompt)
+
+            # Process the response
+            async for message in client.receive_response():
+                if verbose and hasattr(message, 'content'):
+                    # Print text content for debugging
+                    for block in getattr(message, 'content', []):
+                        if hasattr(block, 'text'):
+                            print(block.text)
+
+            # Check if the animation was rendered
+            ctx = get_render_context()
+            output_file = Path(output_path)
+            shader_file = output_file.with_suffix('.glsl')
+
+            if output_file.exists() and shader_file.exists():
+                if verbose:
+                    print(f"Success! Generated {output_path}")
+
+                return {
+                    "gif_path": str(output_file),
+                    "shader_path": str(shader_file),
+                    "shader_code": ctx.get("shader_code", ""),
+                    "success": True,
+                    "error": None
+                }
+            else:
+                return {
+                    "gif_path": None,
+                    "shader_path": None,
+                    "shader_code": None,
+                    "success": False,
+                    "error": "Agent did not produce output files"
+                }
+
+    except Exception as e:
+        return {
+            "gif_path": None,
+            "shader_path": None,
+            "shader_code": None,
+            "success": False,
+            "error": str(e)
+        }
+
+
+async def edit_vfx(
+    existing_shader: str,
+    modification: str,
+    duration: float = 1.0,
+    resolution: Tuple[int, int] = (256, 256),
+    frames: int = 10,
+    output_path: str = "output.gif",
+    verbose: bool = False,
+    loop: bool = False,
+    model: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Edit an existing shader using Claude.
+
+    Args:
+        existing_shader: The existing GLSL shader code to modify
+        modification: Description of the changes to make
+        duration: Animation duration in seconds
+        resolution: (width, height) tuple
+        frames: Number of frames to generate
+        output_path: Path to save the output GIF
+        verbose: Print progress messages
+        loop: If True, create a seamlessly looping effect; if False, effect dissipates by end
+        model: Model to use (default: claude-opus-4-5-20251101)
+
+    Returns:
+        Dictionary with:
+            - gif_path: Path to the generated GIF
+            - shader_path: Path to the saved shader code
+            - shader_code: The modified GLSL shader code
+            - success: Whether editing was successful
+            - error: Error message if failed
+    """
+    try:
+        from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+    except ImportError:
+        raise ImportError(
+            "claude-agent-sdk is required. Install it with: pip install claude-agent-sdk"
+        )
+
+    width, height = resolution
+
+    # Set up the rendering context for tools
+    set_render_context(width, height, duration, frames, output_path)
+
+    # Create the shader tools and MCP server
+    shader_server, allowed_tools = create_shader_tools()
+
+    # Build the edit prompt
+    user_prompt = build_edit_prompt(existing_shader, modification, duration, width, height, loop=loop)
+
+    # Configure the agent with edit system prompt
+    options = ClaudeAgentOptions(
+        model=model or DEFAULT_MODEL,
+        mcp_servers={"shader-tools": shader_server},
+        allowed_tools=allowed_tools,
+        system_prompt=EDIT_SYSTEM_PROMPT,
     )
 
     try:
