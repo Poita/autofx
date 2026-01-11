@@ -33,17 +33,26 @@ export ANTHROPIC_API_KEY=your-api-key
 ## CLI Usage
 
 ```bash
-# Basic usage
+# Basic usage (one-shot effect that dissipates by end)
 autofx "fiery explosion" -o explosion.gif
+
+# Looping effect (seamless loop)
+autofx "magical flames" --loop -d 2.0 -o flames.gif
 
 # With custom settings
 autofx "magic sparkles" --duration 2.0 --resolution 128x128 --frames 20 -o sparkles.gif
 
-# Short options
-autofx "swirling vortex" -d 1.5 -r 256x256 -f 15 -o vortex.gif
+# High-quality with more frames
+autofx "lightning bolt" -d 1.0 -r 256x256 -f 60 -o lightning.gif
+
+# With PNG sprite sheet (auto grid layout)
+autofx "energy ball" -f 16 -s -o energy.gif
+
+# Sprite sheet with specific row count
+autofx "coin spin" --loop -f 8 -s --rows 1 -o coin.gif
 
 # Verbose mode for debugging
-autofx "lightning bolt" -v -o lightning.gif
+autofx "portal vortex" -v -o portal.gif
 ```
 
 ### Options
@@ -56,7 +65,9 @@ autofx "lightning bolt" -v -o lightning.gif
 | `--frames` | `-f` | 10 | Number of frames |
 | `--output` | `-o` | output.gif | Output file path |
 | `--verbose` | `-v` | false | Print detailed progress |
-| `--max-retries` | | 3 | Retry attempts if generation fails |
+| `--loop` | `-l` | false | Create seamlessly looping effect (default: one-shot that dissipates) |
+| `--spritesheet` | `-s` | false | Also output a PNG sprite sheet |
+| `--rows` | | auto | Number of rows in sprite sheet (auto-calculated if not specified) |
 
 ## Library Usage
 
@@ -191,6 +202,9 @@ When you run `autofx "effect" -o effect.gif`, you get:
 
 - `effect.gif` - The animated GIF with transparent background
 - `effect.glsl` - The generated shader source code
+
+With `-s/--spritesheet`, you also get:
+- `effect.png` - PNG sprite sheet with all frames in a grid
 
 The shader file lets you:
 - Modify and re-render the effect

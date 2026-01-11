@@ -99,13 +99,6 @@ With -s/--spritesheet, a PNG sprite sheet is also saved (e.g., explosion.png).
     )
 
     parser.add_argument(
-        "--max-retries",
-        type=int,
-        default=3,
-        help="Maximum retry attempts if generation fails (default: 3)"
-    )
-
-    parser.add_argument(
         "-l", "--loop",
         action="store_true",
         help="Create a seamlessly looping effect (default: one-shot effect that dissipates)"
@@ -156,7 +149,6 @@ async def run_async(args: argparse.Namespace) -> int:
             resolution=args.resolution,
             frames=args.frames,
             output_path=output_path,
-            max_retries=args.max_retries,
             verbose=args.verbose,
             loop=args.loop
         )

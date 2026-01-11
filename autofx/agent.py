@@ -12,9 +12,6 @@ from pathlib import Path
 from .tools import create_shader_tools, set_render_context, get_render_context
 
 
-# Maximum number of agent turns before giving up
-MAX_TURNS = 10
-
 # Model to use for shader generation
 MODEL = "claude-opus-4-5-20251101"
 
@@ -113,7 +110,6 @@ async def generate_vfx(
     resolution: Tuple[int, int] = (256, 256),
     frames: int = 10,
     output_path: str = "output.gif",
-    max_retries: int = 3,
     verbose: bool = False,
     loop: bool = False
 ) -> Dict[str, Any]:
@@ -126,7 +122,6 @@ async def generate_vfx(
         resolution: (width, height) tuple
         frames: Number of frames to generate
         output_path: Path to save the output GIF
-        max_retries: Maximum retry attempts if generation fails
         verbose: Print progress messages
         loop: If True, create a seamlessly looping effect; if False, effect dissipates by end
 
@@ -156,70 +151,59 @@ async def generate_vfx(
     # Build the prompt
     user_prompt = build_prompt(prompt, duration, width, height, loop=loop)
 
-    # Configure the agent
+    # Configure the agent (no max_turns - let it work until done)
     options = ClaudeAgentOptions(
         model=MODEL,
         mcp_servers={"shader-tools": shader_server},
         allowed_tools=allowed_tools,
-        max_turns=MAX_TURNS,
         system_prompt=SYSTEM_PROMPT,
     )
 
-    attempt = 0
-    last_error = None
+    try:
+        async with ClaudeSDKClient(options=options) as client:
+            await client.query(user_prompt)
 
-    while attempt < max_retries:
-        attempt += 1
+            # Process the response
+            async for message in client.receive_response():
+                if verbose and hasattr(message, 'content'):
+                    # Print text content for debugging
+                    for block in getattr(message, 'content', []):
+                        if hasattr(block, 'text'):
+                            print(block.text)
 
-        if verbose:
-            print(f"Attempt {attempt}/{max_retries}...")
+            # Check if the animation was rendered
+            ctx = get_render_context()
+            output_file = Path(output_path)
+            shader_file = output_file.with_suffix('.glsl')
 
-        try:
-            async with ClaudeSDKClient(options=options) as client:
-                await client.query(user_prompt)
+            if output_file.exists() and shader_file.exists():
+                if verbose:
+                    print(f"Success! Generated {output_path}")
 
-                # Process the response
-                async for message in client.receive_response():
-                    if verbose and hasattr(message, 'content'):
-                        # Print text content for debugging
-                        for block in getattr(message, 'content', []):
-                            if hasattr(block, 'text'):
-                                print(f"Claude: {block.text[:200]}...")
+                return {
+                    "gif_path": str(output_file),
+                    "shader_path": str(shader_file),
+                    "shader_code": ctx.get("shader_code", ""),
+                    "success": True,
+                    "error": None
+                }
+            else:
+                return {
+                    "gif_path": None,
+                    "shader_path": None,
+                    "shader_code": None,
+                    "success": False,
+                    "error": "Agent did not produce output files"
+                }
 
-                # Check if the animation was rendered
-                ctx = get_render_context()
-                output_file = Path(output_path)
-                shader_file = output_file.with_suffix('.glsl')
-
-                if output_file.exists() and shader_file.exists():
-                    if verbose:
-                        print(f"Success! Generated {output_path}")
-
-                    return {
-                        "gif_path": str(output_file),
-                        "shader_path": str(shader_file),
-                        "shader_code": ctx.get("shader_code", ""),
-                        "success": True,
-                        "error": None
-                    }
-                else:
-                    last_error = "Agent did not produce output files"
-                    if verbose:
-                        print(f"Warning: {last_error}")
-
-        except Exception as e:
-            last_error = str(e)
-            if verbose:
-                print(f"Error: {last_error}")
-
-    # All retries exhausted
-    return {
-        "gif_path": None,
-        "shader_path": None,
-        "shader_code": None,
-        "success": False,
-        "error": f"Failed after {max_retries} attempts. Last error: {last_error}"
-    }
+    except Exception as e:
+        return {
+            "gif_path": None,
+            "shader_path": None,
+            "shader_code": None,
+            "success": False,
+            "error": str(e)
+        }
 
 
 async def generate_vfx_with_feedback(
