@@ -1,14 +1,20 @@
-// Ethereal Blue Magical Flames with Swirling Wisps
+// Mystical Purple and Pink Fire with Swirling Magical Flames
 // Seamlessly looping over 1.5 seconds
 
 #define PI 3.14159265359
 #define TAU 6.28318530718
 #define DURATION 1.5
 
+// Hash function for randomness
 float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
+float hash1(float n) {
+    return fract(sin(n) * 43758.5453);
+}
+
+// Smooth noise
 float noise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
@@ -22,139 +28,253 @@ float noise(vec2 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-// FBM with perfect looping - all offsets use sin/cos of loopTime
-float fbm(vec2 p, float loopTime) {
+// Fractal Brownian Motion - looping version
+float fbmLoop(vec2 p, float cycle) {
     float value = 0.0;
     float amplitude = 0.5;
     float frequency = 1.0;
     
-    for (int i = 0; i < 6; i++) {
-        float phase = float(i) * 0.5;
-        vec2 offset = vec2(
-            sin(loopTime + phase),
-            cos(loopTime + phase * 1.3)
-        ) * 0.5;
-        value += amplitude * noise(p * frequency + offset);
+    // Use sin/cos for cyclic animation
+    vec2 timeOffset = vec2(sin(cycle), cos(cycle)) * 2.0;
+    
+    for(int i = 0; i < 6; i++) {
+        value += amplitude * noise(p * frequency + timeOffset * float(i + 1) * 0.3);
         amplitude *= 0.5;
         frequency *= 2.0;
     }
     return value;
 }
 
-// Wisp with perfect looping
-float wisp(vec2 uv, float loopTime, float seed) {
-    float angle = atan(uv.y, uv.x) + sin(loopTime + seed * TAU) * 0.7;
-    float radius = length(uv);
+// Swirling distortion - perfectly cyclic
+vec2 swirl(vec2 uv, vec2 center, float strength, float cycle) {
+    vec2 delta = uv - center;
+    float dist = length(delta);
+    float angle = atan(delta.y, delta.x);
+    angle += strength * exp(-dist * 2.5) * sin(cycle);
+    return center + dist * vec2(cos(angle), sin(angle));
+}
+
+// Main fire shape with swirling flames
+float fireShape(vec2 uv, float cycle, float timeLinear) {
+    vec2 centered = uv - vec2(0.5, 0.2);
     
-    // All multipliers of loopTime must result in full cycles
-    // sin completes a full cycle over TAU, loopTime goes 0->TAU over duration
-    // So loopTime * N completes N full cycles
-    float spiral = sin(angle * 4.0 + radius * 8.0 - loopTime * 2.0 + seed * TAU);
-    spiral = spiral * 0.5 + 0.5;
-    spiral = pow(spiral, 0.6);
+    // Taper the fire upward
+    float taper = 1.0 - centered.y * 0.7;
+    centered.x /= max(taper, 0.25);
     
-    float fade = exp(-radius * 2.2);
-    return spiral * fade;
+    // Multiple swirl layers for complex motion
+    vec2 swirled = swirl(uv, vec2(0.5, 0.35), 0.6, cycle);
+    vec2 swirled2 = swirl(uv, vec2(0.45, 0.4), 0.4, cycle * 1.3 + 1.0);
+    vec2 swirled3 = swirl(uv, vec2(0.55, 0.45), 0.3, -cycle * 0.7 + 2.0);
+    
+    // Fire base distance
+    float dist = length(centered * vec2(1.0, 0.6));
+    
+    // Looping noise distortion
+    float noiseOffset = fbmLoop(uv * 5.0, cycle) * 0.35;
+    noiseOffset += fbmLoop(swirled * 7.0, cycle * 1.5) * 0.2;
+    noiseOffset += fbmLoop(swirled2 * 3.0, -cycle * 0.8) * 0.15;
+    
+    // Flame tongues reaching upward
+    float tongues = 0.0;
+    for(int i = 0; i < 4; i++) {
+        float fi = float(i);
+        float phase = fi * 1.57 + cycle;
+        float xPos = 0.35 + fi * 0.1 + sin(phase) * 0.08;
+        float tongueHeight = 0.4 + sin(cycle + fi * 2.0) * 0.15;
+        float tongue = smoothstep(0.08, 0.0, abs(uv.x - xPos)) * 
+                       smoothstep(tongueHeight, 0.2, uv.y) * 
+                       smoothstep(0.15, 0.25, uv.y);
+        tongues += tongue * 0.3;
+    }
+    
+    float flameBase = smoothstep(0.55 + noiseOffset, 0.05, dist);
+    flameBase *= smoothstep(0.0, 0.18, uv.y); // Fade at bottom
+    flameBase *= smoothstep(0.85, 0.6, uv.y); // Fade at top
+    
+    return clamp(flameBase + tongues, 0.0, 1.0);
+}
+
+// Inner hot core
+float fireCore(vec2 uv, float cycle) {
+    vec2 centered = uv - vec2(0.5, 0.28);
+    centered.x *= 1.3;
+    
+    float dist = length(centered);
+    
+    // Pulsing core
+    float pulse = 0.12 + sin(cycle * 2.0) * 0.02;
+    float core = smoothstep(pulse + 0.05, pulse - 0.02, dist);
+    
+    // Add some noise variation
+    core *= 0.8 + fbmLoop(uv * 8.0, cycle) * 0.4;
+    
+    return core * smoothstep(0.1, 0.2, uv.y);
+}
+
+// Ethereal wisps rising upward
+float wisps(vec2 uv, float cycle, float linearTime) {
+    float wispValue = 0.0;
+    
+    for(int i = 0; i < 7; i++) {
+        float fi = float(i);
+        float seed = hash1(fi * 123.456);
+        float seed2 = hash1(fi * 789.012);
+        
+        // Cyclic vertical movement using fract
+        float yPhase = fract(linearTime / DURATION + seed);
+        float xWobble = sin(cycle + fi * 1.1) * 0.12 + sin(cycle * 2.0 + fi) * 0.05;
+        
+        vec2 wispPos = vec2(
+            0.3 + seed2 * 0.4 + xWobble,
+            0.2 + yPhase * 0.55
+        );
+        
+        // Elongated wisp shape
+        vec2 delta = (uv - wispPos) * vec2(1.5, 3.0);
+        float dist = length(delta);
+        
+        // Fade out as it rises
+        float fade = (1.0 - yPhase) * smoothstep(0.0, 0.1, yPhase);
+        float wisp = smoothstep(0.12, 0.0, dist) * fade * 0.4;
+        
+        wispValue += wisp;
+    }
+    
+    return wispValue;
+}
+
+// Glowing particles floating around
+float particles(vec2 uv, float cycle, float linearTime) {
+    float particleValue = 0.0;
+    
+    for(int i = 0; i < 25; i++) {
+        float fi = float(i);
+        float seed = hash1(fi * 12.34);
+        float seed2 = hash1(fi * 56.78);
+        float seed3 = hash1(fi * 90.12);
+        
+        // Cyclic orbital movement
+        float angle = cycle + seed * TAU;
+        float radius = 0.08 + seed2 * 0.2;
+        
+        // Rising motion with cycle
+        float yBase = fract(linearTime / DURATION + seed);
+        float xBase = 0.25 + seed2 * 0.5;
+        
+        vec2 particlePos = vec2(
+            xBase + sin(angle) * radius * 0.4 + cos(angle * 0.7) * 0.05,
+            0.12 + yBase * 0.6 + sin(angle * 0.5) * 0.04
+        );
+        
+        float dist = length(uv - particlePos);
+        float size = 0.006 + seed3 * 0.01;
+        
+        // Soft glow
+        float glow = smoothstep(size * 4.0, 0.0, dist);
+        
+        // Twinkle effect - perfectly cyclic
+        float twinkle = 0.4 + 0.6 * sin(cycle * 3.0 + seed * 20.0);
+        
+        // Fade based on height
+        float fade = (1.0 - yBase * 0.6) * smoothstep(0.0, 0.15, yBase);
+        
+        particleValue += glow * twinkle * fade * 0.35;
+    }
+    
+    return particleValue;
+}
+
+// Outer magical glow
+float magicalGlow(vec2 uv, float cycle) {
+    vec2 centered = uv - vec2(0.5, 0.35);
+    centered.x *= 0.8;
+    float dist = length(centered);
+    
+    float glow = smoothstep(0.5, 0.1, dist) * 0.25;
+    glow *= 0.8 + sin(cycle * 1.5) * 0.2;
+    
+    // Add some swirling to the glow
+    float swirl = fbmLoop(uv * 3.0 + vec2(sin(cycle), cos(cycle)) * 0.5, cycle);
+    glow *= 0.7 + swirl * 0.5;
+    
+    return glow * smoothstep(0.08, 0.2, uv.y) * smoothstep(0.9, 0.7, uv.y);
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
-    vec2 centered = (uv - 0.5) * 2.0;
     
-    centered *= 1.12;
-    centered.y += 0.18;
+    // Add margins to keep effect within bounds
+    vec2 safeUV = uv * 0.82 + 0.09;
     
-    // loopTime goes from 0 to TAU over DURATION seconds
-    float loopTime = iTime * TAU / DURATION;
+    float time = iTime;
+    float cycle = time * TAU / DURATION; // Perfect cycle over duration
     
-    float dist = length(centered);
+    // Get all effect components
+    float fire = fireShape(safeUV, cycle, time);
+    float core = fireCore(safeUV, cycle);
+    float wisp = wisps(safeUV, cycle, time);
+    float particle = particles(safeUV, cycle, time);
+    float glow = magicalGlow(safeUV, cycle);
     
-    // Flame shape
-    vec2 flameUV = centered;
-    flameUV.x *= 1.35;
+    // Color palette - mystical purple and pink
+    vec3 white = vec3(1.0, 1.0, 1.0);
+    vec3 hotPink = vec3(1.0, 0.45, 0.75);
+    vec3 magenta = vec3(0.95, 0.25, 0.65);
+    vec3 purple = vec3(0.65, 0.15, 0.85);
+    vec3 deepPurple = vec3(0.4, 0.05, 0.6);
+    vec3 darkPurple = vec3(0.25, 0.0, 0.4);
     
-    float turbulence = fbm(centered * 2.5, loopTime);
-    flameUV.x += (turbulence - 0.5) * 0.28 * (1.0 - centered.y * 0.35);
+    // Fire color gradient
+    vec3 fireColor = darkPurple;
+    fireColor = mix(fireColor, deepPurple, smoothstep(0.0, 0.2, fire));
+    fireColor = mix(fireColor, purple, smoothstep(0.15, 0.4, fire));
+    fireColor = mix(fireColor, magenta, smoothstep(0.3, 0.55, fire));
+    fireColor = mix(fireColor, hotPink, smoothstep(0.45, 0.7, fire));
+    fireColor = mix(fireColor, white, smoothstep(0.6, 0.9, fire));
     
-    float flameHeight = fbm(vec2(centered.x * 2.0, 0.0), loopTime) * 0.18 + 0.82;
+    // Core is always white-hot
+    vec3 coreColor = mix(hotPink, white, smoothstep(0.3, 0.8, core));
     
-    float flameDist = length(flameUV);
-    float flameShape = 1.0 - smoothstep(0.0, 0.48 * flameHeight, flameDist);
+    // Wisp color - ethereal light purple/pink
+    vec3 wispColor = mix(vec3(0.7, 0.4, 0.95), vec3(1.0, 0.75, 0.95), wisp);
     
-    float taper = smoothstep(-0.6, 0.4, -centered.y);
-    flameShape *= taper;
+    // Particle color - bright sparkles
+    vec3 particleColor = vec3(1.0, 0.9, 1.0);
     
-    // Wispy tendrils - use INTEGER multipliers for rotation
-    float wisps = 0.0;
-    for (int i = 0; i < 6; i++) {
-        float seed = float(i) / 6.0;
-        vec2 wispUV = centered;
-        wispUV.y += 0.08;
-        
-        // Use integer rotation speeds: 1, 2, 3... to ensure full cycles
-        float rotSpeed = float(i + 1);
-        float rotAngle = loopTime * rotSpeed + seed * TAU;
-        mat2 rot = mat2(cos(rotAngle), -sin(rotAngle), sin(rotAngle), cos(rotAngle));
-        wispUV = rot * wispUV;
-        
-        wisps += wisp(wispUV, loopTime, seed) * (0.28 / (1.0 + float(i) * 0.3));
-    }
+    // Glow color - soft purple
+    vec3 glowColor = vec3(0.5, 0.2, 0.7);
     
-    float intensity = flameShape + wisps * 0.6;
+    // Combine all elements
+    vec3 finalColor = vec3(0.0);
+    float finalAlpha = 0.0;
     
-    // Rising particles - fract ensures perfect looping
-    float particles = 0.0;
-    for (int i = 0; i < 12; i++) {
-        float seed = float(i) / 12.0;
-        
-        float risePhase = fract(iTime / DURATION + seed);
-        float particleY = centered.y + 0.6 - risePhase * 1.2;
-        
-        // Integer multiplier for sway
-        float sway = sin(loopTime * 2.0 + seed * TAU) * 0.09;
-        float particleX = centered.x + sway + (hash(vec2(seed, 0.0)) - 0.5) * 0.28;
-        
-        vec2 particlePos = vec2(particleX, particleY);
-        float particleDist = length(particlePos);
-        
-        float particle = exp(-particleDist * particleDist * 140.0);
-        particle *= smoothstep(0.0, 0.1, risePhase) * smoothstep(1.0, 0.9, risePhase);
-        
-        particles += particle;
-    }
+    // Layer 1: Outer glow
+    finalColor += glowColor * glow;
+    finalAlpha = max(finalAlpha, glow * 0.6);
     
-    intensity += particles * 0.32;
+    // Layer 2: Main fire
+    finalColor = mix(finalColor, fireColor, fire);
+    finalAlpha = max(finalAlpha, fire);
     
-    // Pulse uses sin which is cyclic over TAU
-    float pulse = sin(loopTime) * 0.1 + 1.0;
-    intensity *= pulse;
+    // Layer 3: Hot core (additive)
+    finalColor += coreColor * core * 0.8;
+    finalAlpha = max(finalAlpha, core);
     
-    // Colors
-    vec3 coreColor = vec3(1.0, 1.0, 1.0);
-    vec3 midColor = vec3(0.3, 0.6, 1.0);
-    vec3 outerColor = vec3(0.0, 0.88, 1.0);
+    // Layer 4: Wisps
+    finalColor += wispColor * wisp * 1.2;
+    finalAlpha = max(finalAlpha, wisp * 0.7);
     
-    vec3 color;
-    float coreIntensity = smoothstep(0.5, 0.95, intensity);
-    float midIntensity = smoothstep(0.1, 0.55, intensity);
+    // Layer 5: Particles (additive for sparkle)
+    finalColor += particleColor * particle * 1.8;
+    finalAlpha = max(finalAlpha, particle * 0.9);
     
-    color = mix(outerColor, midColor, midIntensity);
-    color = mix(color, coreColor, coreIntensity);
+    // Boost saturation and brightness
+    finalColor *= 1.15;
     
-    float outerGlow = exp(-dist * 1.6) * 0.3 * pulse;
-    color += outerColor * outerGlow;
+    // Clamp and smooth alpha
+    finalAlpha = clamp(finalAlpha, 0.0, 1.0);
+    finalAlpha = smoothstep(0.01, 0.08, finalAlpha) * finalAlpha;
     
-    float shimmer = fbm(centered * 3.5, loopTime);
-    color += vec3(0.06, 0.1, 0.18) * shimmer * intensity * 0.18;
-    
-    float alpha = smoothstep(0.0, 0.09, intensity + outerGlow * 0.45);
-    alpha = clamp(alpha, 0.0, 1.0);
-    
-    color *= 1.08;
-    
-    float edgeFade = smoothstep(0.0, 0.04, uv.x) * smoothstep(1.0, 0.96, uv.x);
-    edgeFade *= smoothstep(0.0, 0.04, uv.y) * smoothstep(1.0, 0.96, uv.y);
-    alpha *= edgeFade;
-    
-    fragColor = vec4(color, alpha);
+    fragColor = vec4(finalColor, finalAlpha);
 }
