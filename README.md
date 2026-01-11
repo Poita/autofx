@@ -106,6 +106,20 @@ autofx "colorful particle explosion with sparks flying in random directions" -n 
 
 Each variation uses a different random seed while sharing the same shader code.
 
+### Edit Example
+
+Modify an existing shader with `--edit`:
+
+```bash
+autofx --edit examples/magic-flames.glsl "make the flames blue instead of purple" --loop -d 1.5 -f 45 -o blue-flames.gif
+```
+
+| Original | Edited |
+|----------|--------|
+| <img src="examples/magic-flames.gif" width="128"> | <img src="examples/blue-flames-black.gif" width="128"> |
+
+The AI modifies the shader's color palette while preserving the flame animation structure.
+
 ## Library Usage
 
 ### High-Level API (with Claude Agent)
