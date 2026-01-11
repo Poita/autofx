@@ -2,6 +2,29 @@
 
 AI-powered visual effects animation generator for games. Describe an effect in plain English and get a transparent GIF animation.
 
+## Examples
+
+<table>
+<tr>
+<td align="center">
+<img src="examples/explosion.gif" width="128" height="128" alt="Explosion"><br>
+<sub>Explosion (one-shot)</sub>
+</td>
+<td align="center">
+<img src="examples/magic-flames.gif" width="128" height="128" alt="Magic Flames"><br>
+<sub>Magic Flames (looping)</sub>
+</td>
+<td align="center">
+<img src="examples/energy-ball.gif" width="128" height="128" alt="Energy Ball"><br>
+<sub>Energy Ball (looping)</sub>
+</td>
+<td align="center">
+<img src="examples/heal.gif" width="128" height="128" alt="Heal"><br>
+<sub>Heal Aura (looping)</sub>
+</td>
+</tr>
+</table>
+
 ## How It Works
 
 1. You describe a visual effect (e.g., "fiery explosion")
