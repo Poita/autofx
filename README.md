@@ -296,6 +296,17 @@ Set your API key:
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+## Gallery
+
+A showcase of effects generated with AutoFX:
+
+| | | | |
+|:---:|:---:|:---:|:---:|
+| <img src="examples/gallery/explosion.gif" width="128"><br>Explosion | <img src="examples/gallery/sparkles.gif" width="128"><br>Sparkles | <img src="examples/gallery/lightning.gif" width="128"><br>Lightning | <img src="examples/gallery/energy-orb.gif" width="128"><br>Energy Orb |
+| <img src="examples/gallery/smoke.gif" width="128"><br>Smoke | <img src="examples/gallery/ripple.gif" width="128"><br>Ripple | <img src="examples/gallery/torch.gif" width="128"><br>Torch | <img src="examples/gallery/ice.gif" width="128"><br>Ice |
+| <img src="examples/gallery/heal.gif" width="128"><br>Heal | <img src="examples/gallery/shock.gif" width="128"><br>Shock | <img src="examples/gallery/portal.gif" width="128"><br>Portal | <img src="examples/gallery/firework.gif" width="128"><br>Firework |
+| <img src="examples/gallery/runes.gif" width="128"><br>Runes | <img src="examples/gallery/meteor.gif" width="128"><br>Meteor | <img src="examples/gallery/poison.gif" width="128"><br>Poison | <img src="examples/gallery/shockwave.gif" width="128"><br>Shockwave |
+
 ## License
 
 MIT
