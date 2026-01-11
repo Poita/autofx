@@ -48,18 +48,19 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 4. **HIGH QUALITY - Performance is NOT a concern**: This is pre-rendered offline, NOT real-time. Go all out on quality! Use complex noise functions (FBM, Perlin, Simplex), multiple layers, many particles, ray marching, whatever produces the best visual result. Don't hold back - more iterations, more detail, more sophistication. Production quality is the goal.
 
-5. **CRITICAL - Transparent Edges**: The edges of the frame MUST be fully transparent (alpha = 0) at ALL times. No part of the effect should touch or extend beyond the frame boundary - this creates ugly hard cutoff edges. Build in safe margins:
-   - Keep all effect elements within the 0.05 to 0.95 UV range (or tighter)
-   - Fade effects to transparent as they approach edges using smoothstep
-   - For particles/sparks: ensure spawn positions and trajectories stay within bounds
-   - When testing frames, visually verify that ALL four edges are completely transparent with no visible cutoff
+5. **NATURAL FRAMING - Design effects to fit naturally**: The effect should be self-contained and naturally fit within the frame WITHOUT artificial edge fading, vignettes, or smoothstep borders. Instead:
+   - **Center and scale appropriately**: Design the effect to naturally occupy the frame with comfortable margins
+   - **Bounded motion**: For particles, sparks, debris - design trajectories that stay within frame naturally (e.g., explode then fall back, orbit around center, rise and fade before reaching top)
+   - **Self-limiting shapes**: Use shapes that have natural boundaries (circles, spheres, bounded noise patterns) rather than infinite patterns that need artificial cropping
+   - **NO edge smoothstep/vignette**: Do NOT add `smoothstep(0.0, 0.1, uv.x)` style edge fading - this looks artificial. The effect itself should simply not extend to the edges.
+   - **Transparent background**: Pixels where the effect doesn't appear should have alpha = 0.0
 
 ## Workflow
 
 1. First, write your shader code and use `compile_shader` to check for errors
 2. Use `render_frame` to see the result at different time values (e.g., 0.0, 0.5, 1.0)
-3. **Carefully inspect each test frame**: Check that all four edges are fully transparent with no effect touching them. If you see ANY non-transparent pixels at the edges, add more margin or fade.
-4. Iterate until the effect looks good AND has clean transparent edges
+3. **Check framing**: Verify the effect fits naturally within the frame. If elements are cut off at edges, redesign the effect's scale or motion - do NOT add artificial edge fading.
+4. Iterate until the effect looks good with natural boundaries
 5. Finally, use `render_animation` to save the complete animation
 
 Always test your shader before declaring it complete!"""
@@ -97,9 +98,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 4. **HIGH QUALITY**: This is pre-rendered offline. Maintain or improve quality.
 
-5. **CRITICAL - Transparent Edges**: The edges of the frame MUST be fully transparent (alpha = 0) at ALL times. No part of the effect should touch or extend beyond the frame boundary.
-   - Keep all effect elements within the 0.05 to 0.95 UV range (or tighter)
-   - Fade effects to transparent as they approach edges using smoothstep
+5. **NATURAL FRAMING**: The effect should fit naturally within the frame WITHOUT artificial edge fading or vignettes. Do NOT add smoothstep edge borders - the effect itself should simply not extend to the edges. If the existing shader has artificial edge fading, consider removing it if the effect can be redesigned to fit naturally.
 
 ## Workflow
 
@@ -107,7 +106,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 2. Make the requested modifications
 3. Use `compile_shader` to check for errors
 4. Use `render_frame` to see the result at different time values (e.g., 0.0, 0.5, 1.0)
-5. **Verify**: Check that the modification was successful AND edges are still transparent
+5. **Verify**: Check that the modification was successful and the effect fits naturally within the frame
 6. Iterate if needed
 7. Finally, use `render_animation` to save the complete animation
 
