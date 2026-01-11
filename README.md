@@ -10,7 +10,6 @@ AI-powered visual effects animation generator for games. Describe an effect in p
 | `autofx "mystical purple flames" --loop -d 1.5 -f 45 -o magic-flames.gif` | <img src="examples/magic-flames.gif" width="128"> |
 | `autofx "glowing energy ball" --loop -f 30 -o energy-ball.gif` | <img src="examples/energy-ball.gif" width="128"> |
 | `autofx "healing aura with rising particles" --loop -f 60 -o heal.gif` | <img src="examples/heal.gif" width="128"> |
-| `autofx --edit magic-flames.glsl "make it blue" ...` | <img src="examples/blue-flames.gif" width="128"> |
 
 ## How It Works
 
