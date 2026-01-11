@@ -87,6 +87,20 @@ autofx explosion.glsl -s -f 16 -o explosion.gif
 | `--model` | `-m` | opus | Model to use for generation |
 | `--verbose` | `-v` | false | Print detailed progress |
 
+### Variations Example
+
+Generate multiple unique variations from the same prompt using `-n`:
+
+```bash
+autofx "colorful particle explosion with sparks flying in random directions" -n 3 -f 30 -o particle-burst.gif
+```
+
+| Variation 0 | Variation 1 | Variation 2 |
+|-------------|-------------|-------------|
+| <img src="examples/particle-burst-0.gif" width="128"> | <img src="examples/particle-burst-1.gif" width="128"> | <img src="examples/particle-burst-2.gif" width="128"> |
+
+Each variation uses a different random seed while sharing the same shader code.
+
 ## Library Usage
 
 ### High-Level API (with Claude Agent)
