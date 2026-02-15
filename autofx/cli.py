@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import shlex
 import sys
+import time as time_mod
 from pathlib import Path
 from typing import Tuple, Optional
 
@@ -221,6 +222,7 @@ async def run_async(args: argparse.Namespace) -> int:
     from .agent import generate_vfx
     from .gif import save_gif, save_spritesheet, get_spritesheet_layout
     from .renderer import render_shader
+    from .timing import get_timer, reset_timer
 
     # Ensure output path has .gif extension
     output_path = args.output
@@ -241,6 +243,10 @@ async def run_async(args: argparse.Namespace) -> int:
         cols, rows = get_spritesheet_layout(args.frames, args.rows)
         print(f"  Sprite sheet: {cols}x{rows} grid")
     print()
+
+    reset_timer()
+    timer = get_timer()
+    timer.start()
 
     try:
         result = await generate_vfx(
@@ -340,6 +346,7 @@ async def run_async(args: argparse.Namespace) -> int:
                 shader_with_header = add_glsl_header(shader_code, generate_cmd, render_cmd)
                 shader_path.write_text(shader_with_header)
 
+            print(timer.summary())
             return 0
         else:
             print()
@@ -365,6 +372,7 @@ def render_from_glsl(args: argparse.Namespace) -> int:
     """Render from an existing GLSL shader file (no AI generation)."""
     from .gif import save_gif, save_spritesheet, get_spritesheet_layout
     from .renderer import render_shader
+    from .timing import get_timer, reset_timer
 
     shader_path = Path(args.prompt)
     if not shader_path.exists():
@@ -392,6 +400,10 @@ def render_from_glsl(args: argparse.Namespace) -> int:
         print(f"  Sprite sheet: {cols}x{rows} grid")
     print()
 
+    reset_timer()
+    timer = get_timer()
+    timer.start()
+
     try:
         output_base = Path(output_path)
 
@@ -401,15 +413,17 @@ def render_from_glsl(args: argparse.Namespace) -> int:
                 variation_gif = output_base.with_stem(f"{output_base.stem}-{i}")
                 print(f"  Rendering variation {i}...")
 
-                frames = render_shader(
-                    shader_code=shader_code,
-                    duration=args.duration,
-                    resolution=args.resolution,
-                    num_frames=args.frames,
-                    seed=float(i)
-                )
+                with timer.phase(f"render_shader (variation {i}, {args.frames} frames)"):
+                    frames = render_shader(
+                        shader_code=shader_code,
+                        duration=args.duration,
+                        resolution=args.resolution,
+                        num_frames=args.frames,
+                        seed=float(i)
+                    )
 
-                save_gif(frames, str(variation_gif), args.duration)
+                with timer.phase(f"save_gif (variation {i})"):
+                    save_gif(frames, str(variation_gif), args.duration)
                 print(f"  GIF: {variation_gif}")
 
                 if args.spritesheet:
@@ -419,15 +433,17 @@ def render_from_glsl(args: argparse.Namespace) -> int:
         else:
             # Single output
             print("  Rendering...")
-            frames = render_shader(
-                shader_code=shader_code,
-                duration=args.duration,
-                resolution=args.resolution,
-                num_frames=args.frames,
-                seed=0.0
-            )
+            with timer.phase(f"render_shader ({args.frames} frames)"):
+                frames = render_shader(
+                    shader_code=shader_code,
+                    duration=args.duration,
+                    resolution=args.resolution,
+                    num_frames=args.frames,
+                    seed=0.0
+                )
 
-            save_gif(frames, output_path, args.duration)
+            with timer.phase("save_gif"):
+                save_gif(frames, output_path, args.duration)
             print(f"  GIF: {output_path}")
 
             if args.spritesheet:
@@ -439,6 +455,7 @@ def render_from_glsl(args: argparse.Namespace) -> int:
 
         print()
         print("Done!")
+        print(timer.summary())
         return 0
 
     except Exception as e:
@@ -454,6 +471,7 @@ async def run_edit_async(args: argparse.Namespace) -> int:
     from .agent import edit_vfx
     from .gif import save_gif, save_spritesheet, get_spritesheet_layout
     from .renderer import render_shader
+    from .timing import get_timer, reset_timer
 
     # Read the existing shader
     shader_path = Path(args.edit)
@@ -482,6 +500,10 @@ async def run_edit_async(args: argparse.Namespace) -> int:
         cols, rows = get_spritesheet_layout(args.frames, args.rows)
         print(f"  Sprite sheet: {cols}x{rows} grid")
     print()
+
+    reset_timer()
+    timer = get_timer()
+    timer.start()
 
     try:
         result = await edit_vfx(
@@ -542,6 +564,7 @@ async def run_edit_async(args: argparse.Namespace) -> int:
                 shader_with_header = add_glsl_header(shader_code, generate_cmd, render_cmd)
                 new_shader_path.write_text(shader_with_header)
 
+            print(timer.summary())
             return 0
         else:
             print()

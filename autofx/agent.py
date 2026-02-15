@@ -6,10 +6,12 @@ text descriptions, with tools to compile and render the shaders.
 """
 
 import asyncio
+import time as time_mod
 from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 
 from .tools import create_shader_tools, set_render_context, get_render_context
+from .timing import get_timer
 
 
 # Default model for shader generation
@@ -275,7 +277,10 @@ async def generate_vfx(
         system_prompt=SYSTEM_PROMPT,
     )
 
+    timer = get_timer()
+
     try:
+        t_agent_start = time_mod.monotonic()
         async with ClaudeSDKClient(options=options) as client:
             await client.query(user_prompt)
 
@@ -287,30 +292,35 @@ async def generate_vfx(
                         if hasattr(block, 'text'):
                             print(block.text)
 
-            # Check if the animation was rendered
-            ctx = get_render_context()
-            output_file = Path(output_path)
-            shader_file = output_file.with_suffix('.glsl')
+        t_agent_total = time_mod.monotonic() - t_agent_start
+        # Calculate agent thinking time = total agent time minus tool call times
+        tool_time = sum(e["elapsed"] for e in timer.events)
+        timer.record("claude agent (thinking + API)", t_agent_total - tool_time)
 
-            if output_file.exists() and shader_file.exists():
-                if verbose:
-                    print(f"Success! Generated {output_path}")
+        # Check if the animation was rendered
+        ctx = get_render_context()
+        output_file = Path(output_path)
+        shader_file = output_file.with_suffix('.glsl')
 
-                return {
-                    "gif_path": str(output_file),
-                    "shader_path": str(shader_file),
-                    "shader_code": ctx.get("shader_code", ""),
-                    "success": True,
-                    "error": None
-                }
-            else:
-                return {
-                    "gif_path": None,
-                    "shader_path": None,
-                    "shader_code": None,
-                    "success": False,
-                    "error": "Agent did not produce output files"
-                }
+        if output_file.exists() and shader_file.exists():
+            if verbose:
+                print(f"Success! Generated {output_path}")
+
+            return {
+                "gif_path": str(output_file),
+                "shader_path": str(shader_file),
+                "shader_code": ctx.get("shader_code", ""),
+                "success": True,
+                "error": None
+            }
+        else:
+            return {
+                "gif_path": None,
+                "shader_path": None,
+                "shader_code": None,
+                "success": False,
+                "error": "Agent did not produce output files"
+            }
 
     except Exception as e:
         return {
@@ -381,7 +391,10 @@ async def edit_vfx(
         system_prompt=EDIT_SYSTEM_PROMPT,
     )
 
+    timer = get_timer()
+
     try:
+        t_agent_start = time_mod.monotonic()
         async with ClaudeSDKClient(options=options) as client:
             await client.query(user_prompt)
 
@@ -393,30 +406,34 @@ async def edit_vfx(
                         if hasattr(block, 'text'):
                             print(block.text)
 
-            # Check if the animation was rendered
-            ctx = get_render_context()
-            output_file = Path(output_path)
-            shader_file = output_file.with_suffix('.glsl')
+        t_agent_total = time_mod.monotonic() - t_agent_start
+        tool_time = sum(e["elapsed"] for e in timer.events)
+        timer.record("claude agent (thinking + API)", t_agent_total - tool_time)
 
-            if output_file.exists() and shader_file.exists():
-                if verbose:
-                    print(f"Success! Generated {output_path}")
+        # Check if the animation was rendered
+        ctx = get_render_context()
+        output_file = Path(output_path)
+        shader_file = output_file.with_suffix('.glsl')
 
-                return {
-                    "gif_path": str(output_file),
-                    "shader_path": str(shader_file),
-                    "shader_code": ctx.get("shader_code", ""),
-                    "success": True,
-                    "error": None
-                }
-            else:
-                return {
-                    "gif_path": None,
-                    "shader_path": None,
-                    "shader_code": None,
-                    "success": False,
-                    "error": "Agent did not produce output files"
-                }
+        if output_file.exists() and shader_file.exists():
+            if verbose:
+                print(f"Success! Generated {output_path}")
+
+            return {
+                "gif_path": str(output_file),
+                "shader_path": str(shader_file),
+                "shader_code": ctx.get("shader_code", ""),
+                "success": True,
+                "error": None
+            }
+        else:
+            return {
+                "gif_path": None,
+                "shader_path": None,
+                "shader_code": None,
+                "success": False,
+                "error": "Agent did not produce output files"
+            }
 
     except Exception as e:
         return {

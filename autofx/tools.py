@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .renderer import ShaderRenderer, compile_shader as _compile_shader
 from .gif import frame_to_base64_png, save_gif
+from .timing import get_timer
 
 
 # Global state for the current rendering context
@@ -74,8 +75,10 @@ def create_shader_tools():
         """Compile a shader and check for errors."""
         shader_code = args["shader_code"]
         ctx = get_render_context()
+        timer = get_timer()
 
-        success, error = _compile_shader(shader_code, ctx["width"], ctx["height"])
+        with timer.phase("compile_shader (tool call)"):
+            success, error = _compile_shader(shader_code, ctx["width"], ctx["height"])
 
         if success:
             # Store the shader code for later use
@@ -101,33 +104,35 @@ def create_shader_tools():
     )
     async def render_frame_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         """Render a single frame and return it as an image."""
+        import time as time_mod
         shader_code = args["shader_code"]
         time = args["time"]
         ctx = get_render_context()
+        timer = get_timer()
 
         try:
+            t0 = time_mod.monotonic()
             with ShaderRenderer(ctx["width"], ctx["height"]) as renderer:
                 frame = renderer.render(shader_code, time, ctx.get("seed", 0.0))
-
-                # Convert to base64 PNG
                 png_base64 = frame_to_base64_png(frame)
+            timer.record(f"render_frame t={time:.2f}s (tool call)", time_mod.monotonic() - t0)
 
-                # Store the shader code
-                ctx["shader_code"] = shader_code
+            # Store the shader code
+            ctx["shader_code"] = shader_code
 
-                return {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Frame rendered at time={time}s. Resolution: {ctx['width']}x{ctx['height']}."
-                        },
-                        {
-                            "type": "image",
-                            "data": png_base64,
-                            "mimeType": "image/png"
-                        }
-                    ]
-                }
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Frame rendered at time={time}s. Resolution: {ctx['width']}x{ctx['height']}."
+                    },
+                    {
+                        "type": "image",
+                        "data": png_base64,
+                        "mimeType": "image/png"
+                    }
+                ]
+            }
         except Exception as e:
             return {
                 "content": [{
@@ -143,10 +148,13 @@ def create_shader_tools():
     )
     async def render_animation_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         """Render all frames and save as GIF."""
+        import time as time_mod
         shader_code = args["shader_code"]
         ctx = get_render_context()
+        timer = get_timer()
 
         try:
+            t0 = time_mod.monotonic()
             with ShaderRenderer(ctx["width"], ctx["height"]) as renderer:
                 frames = renderer.render_animation(
                     shader_code,
@@ -154,49 +162,52 @@ def create_shader_tools():
                     ctx["num_frames"],
                     ctx.get("seed", 0.0)
                 )
+            timer.record(f"render_animation ({ctx['num_frames']} frames)", time_mod.monotonic() - t0)
 
-                # Save the GIF
-                save_gif(frames, ctx["output_path"], ctx["duration"])
+            # Save the GIF
+            t1 = time_mod.monotonic()
+            save_gif(frames, ctx["output_path"], ctx["duration"])
+            timer.record("save_gif", time_mod.monotonic() - t1)
 
-                # Save the shader code
-                shader_path = str(Path(ctx["output_path"]).with_suffix('.glsl'))
-                with open(shader_path, 'w') as f:
-                    f.write(shader_code)
+            # Save the shader code
+            shader_path = str(Path(ctx["output_path"]).with_suffix('.glsl'))
+            with open(shader_path, 'w') as f:
+                f.write(shader_code)
 
-                # Store in context
-                ctx["shader_code"] = shader_code
+            # Store in context
+            ctx["shader_code"] = shader_code
 
-                # Create a preview showing first, middle, and last frames
-                preview_frames = [
-                    frames[0],
-                    frames[len(frames) // 2],
-                    frames[-1]
+            # Create a preview showing first, middle, and last frames
+            preview_frames = [
+                frames[0],
+                frames[len(frames) // 2],
+                frames[-1]
+            ]
+            preview_images = []
+            for i, frame in enumerate(preview_frames):
+                preview_images.append({
+                    "type": "image",
+                    "data": frame_to_base64_png(frame),
+                    "mimeType": "image/png"
+                })
+
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"Animation rendered successfully!\n"
+                            f"- GIF saved to: {ctx['output_path']}\n"
+                            f"- Shader saved to: {shader_path}\n"
+                            f"- Frames: {ctx['num_frames']}\n"
+                            f"- Duration: {ctx['duration']}s\n"
+                            f"- Resolution: {ctx['width']}x{ctx['height']}\n\n"
+                            f"Preview frames (first, middle, last):"
+                        )
+                    },
+                    *preview_images
                 ]
-                preview_images = []
-                for i, frame in enumerate(preview_frames):
-                    preview_images.append({
-                        "type": "image",
-                        "data": frame_to_base64_png(frame),
-                        "mimeType": "image/png"
-                    })
-
-                return {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                f"Animation rendered successfully!\n"
-                                f"- GIF saved to: {ctx['output_path']}\n"
-                                f"- Shader saved to: {shader_path}\n"
-                                f"- Frames: {ctx['num_frames']}\n"
-                                f"- Duration: {ctx['duration']}s\n"
-                                f"- Resolution: {ctx['width']}x{ctx['height']}\n\n"
-                                f"Preview frames (first, middle, last):"
-                            )
-                        },
-                        *preview_images
-                    ]
-                }
+            }
         except Exception as e:
             return {
                 "content": [{
