@@ -22,21 +22,51 @@ The Claude agent has access to tools that let it compile, test, and preview shad
 
 ## Installation
 
+### macOS
+
 ```bash
-# Clone or download this repository
+git clone https://github.com/Poita/autofx.git
 cd autofx
-
-# Install the package
 pip install -e .
-
-# Or install dependencies directly
-pip install claude-agent-sdk moderngl pillow numpy
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-You'll also need to set your Anthropic API key:
+ModernGL ships prebuilt wheels for macOS, so no system packages needed beyond a working OpenGL (already present on every Mac).
+
+### Linux (headless servers, Docker, etc.)
+
+ModernGL doesn't have prebuilt aarch64 wheels and its `glcontext` extension compiles against several display backends, so a Linux install needs both the build toolchain and runtime + dev libraries for X11/EGL/GL/GLES, even if you're rendering headless.
+
+On Debian / Ubuntu (and its derivatives):
 
 ```bash
-export ANTHROPIC_API_KEY=your-api-key
+# Build deps for moderngl's C++ extension
+sudo apt install -y g++ python3-dev libx11-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev
+
+# Runtime libs (libosmesa / Mesa software rendering for headless boxes)
+sudo apt install -y libegl1 libegl-mesa0 libgl1 libglx-mesa0 libgles2
+
+# Then install autofx
+git clone https://github.com/Poita/autofx.git
+cd autofx
+pip install -e .
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Headless rendering hints (no display, no GPU)
+export LIBGL_ALWAYS_SOFTWARE=1
+export EGL_PLATFORM=surfaceless
+```
+
+### Linux (desktop, with a real GPU + display)
+
+Same as the headless instructions but without the `LIBGL_ALWAYS_SOFTWARE` / `EGL_PLATFORM` overrides — your driver handles it.
+
+### Anthropic API key
+
+`autofx` uses the Claude API to generate shaders, so you need an `ANTHROPIC_API_KEY`. Get one from <https://console.anthropic.com/>. Set it before running:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ## CLI Usage
@@ -270,14 +300,22 @@ The `.glsl` file can be re-rendered at any time: `autofx effect.glsl -r 512x512 
 
 ### "moderngl.Error: cannot create context"
 
-Make sure you have a working OpenGL driver. On headless servers, you may need to install OSMesa:
+You're missing OpenGL/EGL libraries or the headless rendering environment isn't configured. See the [Linux installation section](#linux-headless-servers-docker-etc) — install the apt packages and export `LIBGL_ALWAYS_SOFTWARE=1` and `EGL_PLATFORM=surfaceless`.
+
+### Compile error: `glcontext/x11.cpp:5:10: fatal error: X11/Xlib.h: No such file or directory`
+
+`moderngl`'s context module is being compiled from source and it needs X11 dev headers even in a headless build (it tries every display backend at compile time):
 
 ```bash
-# Ubuntu/Debian
-sudo apt-get install libosmesa6-dev
+sudo apt install -y libx11-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev
+```
 
-# Then set environment variable
-export PYOPENGL_PLATFORM=osmesa
+### Compile error: `aarch64-linux-gnu-g++: No such file or directory`
+
+You're on ARM64 Linux without a C++ toolchain. ModernGL doesn't ship aarch64 wheels yet, so it compiles from source:
+
+```bash
+sudo apt install -y g++ python3-dev
 ```
 
 ### "claude-agent-sdk not found"
