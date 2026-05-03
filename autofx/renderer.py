@@ -71,8 +71,22 @@ class ShaderRenderer:
         self.width = width
         self.height = height
 
-        # Create standalone OpenGL context (no window required)
-        self.ctx = moderngl.create_standalone_context()
+        # Create standalone OpenGL context (no window required).
+        # Backend selection:
+        #   - MODERNGL_BACKEND env var if set (override)
+        #   - 'egl' on Linux (works on headless servers via Mesa surfaceless;
+        #     moderngl's default standalone init tries X11 first, which fails
+        #     with `XOpenDisplay: cannot open display` on a server with no X)
+        #   - default elsewhere (cgl on macOS, wgl on Windows)
+        import os
+        import sys
+        backend = os.environ.get("MODERNGL_BACKEND")
+        if backend:
+            self.ctx = moderngl.create_context(standalone=True, backend=backend)
+        elif sys.platform.startswith("linux"):
+            self.ctx = moderngl.create_context(standalone=True, backend="egl")
+        else:
+            self.ctx = moderngl.create_standalone_context()
 
         # Create framebuffer for offscreen rendering
         self.fbo = self.ctx.framebuffer(
