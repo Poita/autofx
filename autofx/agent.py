@@ -10,12 +10,9 @@ import time as time_mod
 from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 
+from .config import DEFAULT_MODEL
 from .tools import create_shader_tools, set_render_context, get_render_context
 from .timing import get_timer
-
-
-# Default model for shader generation
-DEFAULT_MODEL = "claude-opus-4-8"
 
 # System prompt for the shader generation agent
 SYSTEM_PROMPT = """You are an expert GLSL shader programmer specializing in Shadertoy-style visual effects.
@@ -241,7 +238,7 @@ async def generate_vfx(
         verbose: Print progress messages
         loop: If True, create a seamlessly looping effect; if False, effect dissipates by end
         variations: Number of variations to generate (tells agent to use iSeed if > 1)
-        model: Model to use (default: claude-opus-4-8)
+        model: Model to use (defaults to DEFAULT_MODEL)
 
     Returns:
         Dictionary with:
@@ -355,7 +352,7 @@ async def edit_vfx(
         output_path: Path to save the output GIF
         verbose: Print progress messages
         loop: If True, create a seamlessly looping effect; if False, effect dissipates by end
-        model: Model to use (default: claude-opus-4-8)
+        model: Model to use (defaults to DEFAULT_MODEL)
 
     Returns:
         Dictionary with:

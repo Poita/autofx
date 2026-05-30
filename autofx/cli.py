@@ -16,6 +16,8 @@ import time as time_mod
 from pathlib import Path
 from typing import Tuple, Optional
 
+from .config import DEFAULT_MODEL
+
 
 def parse_resolution(value: str) -> Tuple[int, int]:
     """Parse resolution string like '256x256' into (width, height) tuple."""
@@ -203,7 +205,7 @@ The .glsl file includes comments with the original command and a render command.
         "-m", "--model",
         type=str,
         default=None,
-        help="Model to use for generation (default: claude-opus-4-8)"
+        help=f"Model to use for generation (default: {DEFAULT_MODEL})"
     )
 
     parser.add_argument(
