@@ -203,7 +203,7 @@ The .glsl file includes comments with the original command and a render command.
         "-m", "--model",
         type=str,
         default=None,
-        help="Model to use for generation (default: claude-opus-4-7)"
+        help="Model to use for generation (default: claude-opus-4-8)"
     )
 
     parser.add_argument(
