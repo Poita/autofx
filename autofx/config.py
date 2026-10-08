@@ -8,4 +8,4 @@ or SDK dependencies.
 
 # Default Claude model used for shader generation.
 # This is the single source of truth — update it here only.
-DEFAULT_MODEL = "claude-opus-4-8"
+DEFAULT_MODEL = "claude-opus-5-5"
