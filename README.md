@@ -326,6 +326,14 @@ Install the Claude Agent SDK:
 pip install claude-agent-sdk
 ```
 
+### "Agent did not produce output files" / "does not support this model"
+
+Your `claude-agent-sdk` bundles a Claude Code CLI that is too old for the default model. Upgrade it:
+
+```bash
+pip install -U "claude-agent-sdk>=0.2.158"
+```
+
 ### "ANTHROPIC_API_KEY not set"
 
 Set your API key:
