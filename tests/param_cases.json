@@ -1,0 +1,55 @@
+{
+  "valid": [
+    {
+      "name": "float with range and description",
+      "source": "// @param speed float 1.5 [0.1, 4.0] \"Overall animation speed\"\nvoid mainImage(out vec4 c, in vec2 p) {}",
+      "params": [
+        {"name": "speed", "type": "float", "default": 1.5, "min": 0.1, "max": 4.0, "description": "Overall animation speed", "line": 1}
+      ]
+    },
+    {
+      "name": "every type",
+      "source": "// @param count int 24 [4, 64] \"Number of sparks\"\n// @param core color #FFB547 \"Core color\"\n// @param smoke bool true \"Draw smoke\"\n// @param wind vec2 (0.2, -0.5) [-1, 1] \"Wind\"\n// @param tint vec3 (1, 0.5, 0.25) [0, 2]",
+      "params": [
+        {"name": "count", "type": "int", "default": 24, "min": 4, "max": 64, "description": "Number of sparks", "line": 1},
+        {"name": "core", "type": "color", "default": "#ffb547", "min": null, "max": null, "description": "Core color", "line": 2},
+        {"name": "smoke", "type": "bool", "default": true, "min": null, "max": null, "description": "Draw smoke", "line": 3},
+        {"name": "wind", "type": "vec2", "default": [0.2, -0.5], "min": -1, "max": 1, "description": "Wind", "line": 4},
+        {"name": "tint", "type": "vec3", "default": [1, 0.5, 0.25], "min": 0, "max": 2, "description": "", "line": 5}
+      ]
+    },
+    {
+      "name": "indented, extra spacing, negative and exponent numbers",
+      "source": "void f() {}\n    //   @param  offset   float  -2.5e-1  [ -1 , .5 ]   \"Shift\"",
+      "params": [
+        {"name": "offset", "type": "float", "default": -0.25, "min": -1, "max": 0.5, "description": "Shift", "line": 2}
+      ]
+    },
+    {
+      "name": "bool false and ordinary comments ignored",
+      "source": "// a normal comment mentioning param\n// @param glow bool false\n/* @param ignored float 1 [0, 2] */",
+      "params": [
+        {"name": "glow", "type": "bool", "default": false, "min": null, "max": null, "description": "", "line": 2}
+      ]
+    },
+    {
+      "name": "no params",
+      "source": "void mainImage(out vec4 c, in vec2 p) { c = vec4(0.0); }",
+      "params": []
+    }
+  ],
+  "invalid": [
+    {"name": "unknown type", "source": "// @param size double 1.0 [0, 2]", "error": "line 1: unknown type 'double'"},
+    {"name": "missing range for float", "source": "// @param size float 1.0", "error": "line 1: 'size' needs a [min, max] range"},
+    {"name": "range on bool", "source": "// @param on bool true [0, 1]", "error": "line 1: 'on' (bool) cannot have a range"},
+    {"name": "default outside range", "source": "// @param size float 5.0 [0, 2]", "error": "line 1: default for 'size' is outside [0, 2]"},
+    {"name": "min not below max", "source": "// @param size float 1.0 [2, 1]", "error": "line 1: range min must be less than max for 'size'"},
+    {"name": "int with fractional default", "source": "// @param n int 2.5 [0, 10]", "error": "line 1: 'n' (int) needs whole numbers"},
+    {"name": "bad color", "source": "// @param c color red", "error": "line 1: 'c' (color) default must look like #rrggbb"},
+    {"name": "vector component count", "source": "// @param v vec3 (1, 2) [0, 5]", "error": "line 1: 'v' (vec3) default needs 3 components"},
+    {"name": "duplicate name", "source": "// @param a float 1 [0, 2]\n// @param a float 1 [0, 2]", "error": "line 2: duplicate parameter 'a'"},
+    {"name": "reserved name", "source": "// @param iTime float 1 [0, 2]", "error": "line 1: 'iTime' is reserved"},
+    {"name": "trailing junk", "source": "// @param a float 1 [0, 2] \"ok\" extra", "error": "line 1: could not parse"},
+    {"name": "missing default", "source": "// @param a float", "error": "line 1: could not parse"}
+  ]
+}
