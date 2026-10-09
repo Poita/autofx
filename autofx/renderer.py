@@ -4,10 +4,11 @@ ModernGL-based shader renderer for Shadertoy-style GLSL shaders.
 Renders fragment shaders to RGBA images with support for:
 - iTime: Animation time in seconds
 - iResolution: Viewport resolution (vec3)
+- Tweakable parameters declared with `// @param` comments (see params.py)
 - Transparent background support
 """
 
-from typing import List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 import numpy as np
 from PIL import Image
 
@@ -18,6 +19,8 @@ except ImportError:
         "moderngl is required for shader rendering. "
         "Install it with: pip install moderngl"
     )
+
+from .params import parse_params, uniform_declarations, uniform_values
 
 
 # Vertex shader for full-screen quad
@@ -39,7 +42,7 @@ FRAGMENT_SHADER_TEMPLATE = """
 uniform float iTime;
 uniform vec3 iResolution;
 uniform float iSeed;
-
+{PARAM_UNIFORMS}
 out vec4 fragColor;
 
 {USER_SHADER}
@@ -108,6 +111,7 @@ class ShaderRenderer:
         self.vbo = self.ctx.buffer(vertices)
         self.program = None
         self.vao = None
+        self.params = []
 
     def compile_shader(self, shader_code: str) -> Tuple[bool, Optional[str]]:
         """
@@ -119,8 +123,14 @@ class ShaderRenderer:
         Returns:
             Tuple of (success, error_message)
         """
-        # Build the full fragment shader
-        fragment_shader = FRAGMENT_SHADER_TEMPLATE.replace("{USER_SHADER}", shader_code)
+        params, errors = parse_params(shader_code)
+        if errors:
+            return False, "Invalid @param lines:\n" + "\n".join(errors)
+        self.params = params
+
+        fragment_shader = (FRAGMENT_SHADER_TEMPLATE
+                           .replace("{PARAM_UNIFORMS}", uniform_declarations(params))
+                           .replace("{USER_SHADER}", shader_code))
 
         try:
             self.program = self.ctx.program(
@@ -141,7 +151,13 @@ class ShaderRenderer:
             # Try to extract useful error info
             return False, error_msg
 
-    def render(self, shader_code: str, time: float, seed: float = 0.0) -> Image.Image:
+    def render(
+        self,
+        shader_code: str,
+        time: float,
+        seed: float = 0.0,
+        params: Optional[Dict[str, Any]] = None
+    ) -> Image.Image:
         """
         Render the shader at a specific time value.
 
@@ -149,6 +165,7 @@ class ShaderRenderer:
             shader_code: The user's shader code containing mainImage function
             time: The iTime value to use (seconds)
             seed: The iSeed value for procedural variation (default: 0.0)
+            params: Values for @param parameters; unlisted ones use their defaults
 
         Returns:
             PIL Image in RGBA mode
@@ -173,6 +190,10 @@ class ShaderRenderer:
             )
         if 'iSeed' in self.program:
             self.program['iSeed'].value = seed
+        # The GLSL compiler drops unused uniforms, so only set the ones that remain.
+        for name, value in uniform_values(self.params, params).items():
+            if name in self.program:
+                self.program[name].value = value
 
         # Render to framebuffer
         self.fbo.use()
@@ -193,7 +214,8 @@ class ShaderRenderer:
         shader_code: str,
         duration: float,
         num_frames: int,
-        seed: float = 0.0
+        seed: float = 0.0,
+        params: Optional[Dict[str, Any]] = None
     ) -> List[Image.Image]:
         """
         Render an animation as a sequence of frames.
@@ -203,6 +225,7 @@ class ShaderRenderer:
             duration: Total animation duration in seconds
             num_frames: Number of frames to render
             seed: The iSeed value for procedural variation (default: 0.0)
+            params: Values for @param parameters; unlisted ones use their defaults
 
         Returns:
             List of PIL Images in RGBA mode
@@ -219,7 +242,7 @@ class ShaderRenderer:
             time = (i / max(num_frames - 1, 1)) * duration
 
             # Render the frame (shader already compiled)
-            frame = self.render(shader_code, time, seed)
+            frame = self.render(shader_code, time, seed, params)
             frames.append(frame)
 
         return frames
@@ -250,7 +273,8 @@ def render_shader(
     duration: float,
     resolution: Tuple[int, int],
     num_frames: int,
-    seed: float = 0.0
+    seed: float = 0.0,
+    params: Optional[Dict[str, Any]] = None
 ) -> List[Image.Image]:
     """
     Convenience function to render a shader animation.
@@ -261,6 +285,7 @@ def render_shader(
         resolution: (width, height) tuple
         num_frames: Number of frames to generate
         seed: The iSeed value for procedural variation (default: 0.0)
+        params: Values for @param parameters; unlisted ones use their defaults
 
     Returns:
         List of PIL Images in RGBA mode
@@ -268,7 +293,7 @@ def render_shader(
     width, height = resolution
 
     with ShaderRenderer(width, height) as renderer:
-        return renderer.render_animation(shader_code, duration, num_frames, seed)
+        return renderer.render_animation(shader_code, duration, num_frames, seed, params)
 
 
 def compile_shader(shader_code: str, width: int = 256, height: int = 256) -> Tuple[bool, Optional[str]]:
