@@ -12,6 +12,7 @@ import base64
 import io
 from pathlib import Path
 
+from .params import parse_params
 from .renderer import ShaderRenderer, compile_shader as _compile_shader
 from .gif import frame_to_base64_png, save_gif
 from .timing import get_timer
@@ -53,6 +54,41 @@ def get_render_context() -> Dict[str, Any]:
     return _current_context
 
 
+def _format_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return "(" + ", ".join(str(v) for v in value) + ")"
+    return str(value)
+
+
+def describe_compile_result(shader_code: str, success: bool, error: Optional[str]) -> str:
+    """Tool response text for a compile attempt, listing the parameters the shader exposes."""
+    if not success:
+        return f"Shader compilation failed:\n{error}\n\nPlease fix the errors and try again."
+
+    params, _ = parse_params(shader_code)
+    if not params:
+        return (
+            "Shader compiled successfully, but it has No tweakable parameters. Add 4-10 "
+            "`// @param` lines for the knobs an artist would want (speed, size, intensity, "
+            "colors, counts, ...) and use them in the shader."
+        )
+
+    lines = []
+    for p in params:
+        entry = f"- {p.name} ({p.type}) = {_format_value(p.default)}"
+        if p.min is not None:
+            entry += f" in [{p.min}, {p.max}]"
+        if p.description:
+            entry += f": {p.description}"
+        lines.append(entry)
+    return (
+        "Shader compiled successfully! You can now render frames with render_frame or "
+        f"render_animation.\n\nTweakable parameters ({len(params)}):\n" + "\n".join(lines)
+    )
+
+
 def create_shader_tools():
     """
     Create the shader tools for the agent.
@@ -83,48 +119,60 @@ def create_shader_tools():
         if success:
             # Store the shader code for later use
             ctx["shader_code"] = shader_code
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": "Shader compiled successfully! You can now render frames with render_frame or render_animation."
-                }]
-            }
-        else:
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": f"Shader compilation failed:\n{error}\n\nPlease fix the errors and try again."
-                }]
-            }
+        return {
+            "content": [{
+                "type": "text",
+                "text": describe_compile_result(shader_code, success, error)
+            }]
+        }
 
     @tool(
         "render_frame",
-        "Render a single frame of the shader at a specific time. Returns the image so you can see the result.",
-        {"shader_code": str, "time": float}
+        "Render a single frame of the shader at a specific time. Returns the image so you can see "
+        "the result. Optional `params` overrides @param values by name for this frame only.",
+        {
+            "type": "object",
+            "properties": {
+                "shader_code": {"type": "string"},
+                "time": {"type": "number"},
+                "params": {
+                    "type": "object",
+                    "description": "Parameter overrides, e.g. {\"speed\": 2.0, \"tint\": \"#ff0000\", \"wind\": [0.5, 0.0]}",
+                },
+            },
+            "required": ["shader_code", "time"],
+        }
     )
     async def render_frame_tool(args: Dict[str, Any]) -> Dict[str, Any]:
         """Render a single frame and return it as an image."""
         import time as time_mod
         shader_code = args["shader_code"]
         time = args["time"]
+        overrides = args.get("params") or {}
         ctx = get_render_context()
         timer = get_timer()
 
         try:
             t0 = time_mod.monotonic()
             with ShaderRenderer(ctx["width"], ctx["height"]) as renderer:
-                frame = renderer.render(shader_code, time, ctx.get("seed", 0.0))
+                frame = renderer.render(shader_code, time, ctx.get("seed", 0.0), overrides)
+                unknown = sorted(set(overrides) - {p.name for p in renderer.params})
                 png_base64 = frame_to_base64_png(frame)
             timer.record(f"render_frame t={time:.2f}s (tool call)", time_mod.monotonic() - t0)
 
             # Store the shader code
             ctx["shader_code"] = shader_code
 
+            text = f"Frame rendered at time={time}s. Resolution: {ctx['width']}x{ctx['height']}."
+            if overrides:
+                text += f" Parameter overrides: {overrides}."
+            if unknown:
+                text += f" Unknown parameters ignored: {', '.join(unknown)}."
             return {
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Frame rendered at time={time}s. Resolution: {ctx['width']}x{ctx['height']}."
+                        "text": text
                     },
                     {
                         "type": "image",

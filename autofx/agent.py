@@ -14,6 +14,58 @@ from .config import DEFAULT_MODEL
 from .tools import create_shader_tools, set_render_context, get_render_context
 from .timing import get_timer
 
+# Shared guidance for tweakable parameters and browser portability; appended to both system prompts.
+PARAMS_GUIDE = """
+## Tweakable Parameters
+
+Expose the knobs an artist would want to play with as `@param` comment lines at the top of the shader, before any code. One line per parameter:
+
+```
+// @param <name> <type> <default> [min, max] "description"
+```
+
+Types and default syntax:
+- `float` — `1.5`, range required
+- `int` — `24`, range required, whole numbers
+- `bool` — `true` / `false`, no range
+- `color` — `#ffb547`, no range; arrives in the shader as a `vec3` RGB in 0-1
+- `vec2` — `(0.2, -0.5)`, range required and applies to every component
+- `vec3` — `(1.0, 0.5, 0.25)`, range required and applies to every component
+
+Each `@param` line declares its uniform automatically. Do NOT write `uniform` declarations for parameters; just use the name in the code.
+
+Example for a torch flame:
+
+```glsl
+// @param flameSpeed int 2 [1, 4] "Flicker cycles per loop"
+// @param flameHeight float 0.55 [0.3, 0.75] "Flame height as a fraction of the frame"
+// @param intensity float 1.0 [0.3, 2.0] "Overall brightness and glow"
+// @param turbulence float 0.6 [0.0, 1.5] "How much the flame tongues churn"
+// @param coreColor color #fff1c2 "Color of the hottest part of the flame"
+// @param edgeColor color #ff4a00 "Color at the flame edges"
+// @param emberCount int 10 [0, 30] "Number of rising embers"
+// @param showSmoke bool true "Draw a faint smoke trail above the flame"
+```
+
+Choosing parameters:
+- Expose 4-10 parameters chosen for THIS effect: the things someone tuning it for a game would reach for. Typical candidates: speed or timing, size/scale/spread, intensity/brightness/glow, the key colors, counts and density (particles, sparks, rings), turbulence or noise detail, direction, thickness, falloff. Do not expose meaningless implementation constants.
+- Use clear camelCase names and a short description for every parameter.
+- The defaults ARE the effect: with every parameter at its default, the shader must look exactly as you designed it.
+- Every value in every range must still produce a good-looking, valid effect:
+  - The effect must stay inside the frame at the maximum size/spread/height. Choose max values accordingly.
+  - LOOPING effects must stay seamless for every value. Never multiply iTime by an arbitrary float speed: that breaks the loop. Use an `int` parameter for the number of cycles per loop (as `flameSpeed` above), or apply speed-like floats to things that do not change the loop period.
+  - ONE-SHOT effects must still finish (fully transparent) by the end of the duration for every value. Tie timing parameters to the duration, e.g. "peak time as a fraction of the duration" in [0.2, 0.6], rather than a raw speed multiplier that could push the fade-out past the end.
+- `int` parameters may be used as loop bounds; the declared max is the largest value the loop will see.
+- `render_frame` accepts an optional `params` object (e.g. `{"emberCount": 30, "flameHeight": 0.75}`) that overrides parameter values for that frame. Use it to check the extremes of your ranges. `render_animation` always renders the defaults.
+
+## Browser Compatibility
+
+The shader is also previewed live in a browser editor using WebGL2 (GLSL ES 3.00), so it must be valid in both desktop GLSL 330 and GLSL ES 3.00:
+- No implicit int-to-float conversions: write `1.0` not `1` in float expressions, and `float(i)` when mixing an int with floats.
+- Do not add `#version`, `precision` statements, or desktop-only features (`double`, `gl_FragColor`, etc.).
+- Do not use identifiers that are reserved words in GLSL ES, such as `input`, `output`, `filter`, `sample`, `active`, `common` or `partition`.
+"""
+
 # System prompt for the shader generation agent
 SYSTEM_PROMPT = """You are an expert GLSL shader programmer specializing in Shadertoy-style visual effects.
 
@@ -62,7 +114,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 4. Iterate until the effect looks good with natural boundaries
 5. Finally, use `render_animation` to save the complete animation
 
-Always test your shader before declaring it complete!"""
+Always test your shader before declaring it complete!""" + PARAMS_GUIDE
 
 # System prompt for editing existing shaders
 EDIT_SYSTEM_PROMPT = """You are an expert GLSL shader programmer specializing in Shadertoy-style visual effects.
@@ -89,7 +141,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 ## Important Guidelines
 
-1. **Preserve What Works**: The existing shader already produces a working effect. Make targeted changes to achieve the requested modification without breaking what already works.
+1. **Preserve What Works**: The existing shader already produces a working effect. Make targeted changes to achieve the requested modification without breaking what already works. Keep its `@param` lines, update them when the change affects what is tweakable, and add parameters if the shader has none.
 
 2. **Transparency**: Use the alpha channel (fragColor.a) for transparency. Pixels where the effect doesn't appear should have alpha = 0.0.
 
@@ -109,7 +161,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 6. Iterate if needed
 7. Finally, use `render_animation` to save the complete animation
 
-Always test your modified shader before declaring it complete!"""
+Always test your modified shader before declaring it complete!""" + PARAMS_GUIDE
 
 
 def build_prompt(
@@ -164,13 +216,14 @@ Specifications:
 - IMPORTANT: The effect must fit ENTIRELY within the frame bounds at all times. Nothing should be cut off at the edges!
 
 Please:
-1. Write the shader code (center the effect, add margins to keep it within bounds)
+1. Write the shader code (center the effect, add margins to keep it within bounds), with `@param` lines for its tweakable parameters
 2. Compile it to check for errors
 3. Render test frames at t=0, t=middle, t=end to verify it looks correct AND fits within frame
 4. CRITICAL VERIFICATION:
    - For NON-LOOPING effects: verify the FINAL frame is completely transparent (nothing visible)
    - For LOOPING effects: verify t=0 and t=end frames are IDENTICAL (compare them carefully!)
-5. Render the final animation when satisfied
+5. Render frames with extreme parameter values (via the `params` override) to confirm every range stays in frame and keeps the loop/one-shot behavior
+6. Render the final animation when satisfied
 
 Begin by writing the shader code for this effect."""
 
