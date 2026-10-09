@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AutoFX Shader Editor</title>
+<style>
+/* Layout: three columns (shader list | preview over code | parameters) filling the window; stacks to one column on narrow screens. */
+:root {
+  --bg: #0e1015;
+  --panel: #151820;
+  --raised: #1c2029;
+  --line: #2a2f3b;
+  --fg: #e6e8ee;
+  --muted: #8a91a3;
+  --accent: #ffb547;
+  --accent-ink: #1a1206;
+  --error: #ff6b6b;
+  --ok: #6fd39a;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.45 var(--ui); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: var(--raised); border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: 0.4; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.icon { padding: 4px 8px; min-width: 32px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[type="number"], input[type="text"], input[type="search"], select {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; min-width: 0;
+}
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.mono { font-family: var(--mono); }
+
+.app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); padding-top: env(safe-area-inset-top, 0px); }
+
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.brand { font-weight: 700; letter-spacing: 0.02em; }
+.brand span { color: var(--accent); }
+.title { font-family: var(--mono); color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 160px; }
+.title b { color: var(--fg); font-weight: 500; }
+.status { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+.status.dirty { color: var(--accent); border-color: var(--accent); }
+.status.error { color: var(--error); border-color: var(--error); }
+.status.ok { color: var(--ok); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.saveas { display: flex; gap: 6px; align-items: center; }
+.saveas input { width: 220px; font-family: var(--mono); }
+
+main { display: grid; grid-template-columns: 220px minmax(0, 1fr) 340px; min-height: 0; }
+main > * { min-height: 0; min-width: 0; }
+
+.shaders { border-right: 1px solid var(--line); display: flex; flex-direction: column; background: var(--panel); }
+.shaders .head { padding: 10px 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
+.shaders ul { list-style: none; margin: 0; padding: 6px 0; overflow: auto; flex: 1; }
+.shaders li.dir { padding: 8px 12px 2px; font-size: 11px; color: var(--muted); font-family: var(--mono); overflow-wrap: anywhere; }
+.shaders li button { width: 100%; text-align: left; background: none; border: 0; border-radius: 0; padding: 4px 12px 4px 20px; font-family: var(--mono); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.shaders li button:hover { background: var(--raised); }
+.shaders li button[aria-current="true"] { background: var(--raised); color: var(--accent); }
+.shaders li button .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); visibility: hidden; flex: none; }
+.shaders li button.dirty .dot { visibility: visible; }
+.shaders .empty { padding: 12px; color: var(--muted); }
+
+.center { display: grid; grid-template-rows: minmax(240px, 1.25fr) auto minmax(160px, 1fr); }
+
+.stage { position: relative; display: grid; place-items: center; padding: 16px; overflow: hidden; border-bottom: 1px solid var(--line); }
+.stage.checker { background: repeating-conic-gradient(#20242d 0 25%, #171a21 0 50%) 0 0 / 20px 20px; }
+.stage.black { background: #000; }
+.stage.white { background: #fff; }
+.stage.gray { background: #6b6f78; }
+canvas { display: block; max-width: 100%; max-height: 100%; width: auto; height: 100%; object-fit: contain; }
+.drop { position: absolute; inset: 8px; border: 2px dashed var(--accent); border-radius: 8px; display: grid; place-items: center; color: var(--accent); background: rgba(14, 16, 21, 0.85); font-weight: 600; }
+.glerror { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--error); }
+
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.transport .scrub { flex: 1 1 220px; display: flex; align-items: center; gap: 10px; }
+.transport input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 80px; }
+.transport .time { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.field { display: flex; align-items: center; gap: 6px; }
+.field input[type="number"] { width: 64px; }
+
+.code { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; }
+.code .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 16px; border-bottom: 1px solid var(--line); }
+.editor { display: grid; grid-template-columns: auto minmax(0, 1fr); min-height: 0; background: var(--bg); }
+.gutter { margin: 0; padding: 10px 8px 10px 12px; text-align: right; color: #4c5263; font: 12px/1.55 var(--mono); overflow: hidden; user-select: none; border-right: 1px solid var(--line); }
+.gutter .err { color: var(--error); font-weight: 700; }
+textarea { margin: 0; border: 0; resize: none; background: transparent; padding: 10px 12px; font: 12px/1.55 var(--mono); white-space: pre; overflow: auto; tab-size: 4; outline: none; }
+.errors { margin: 0; padding: 0; list-style: none; max-height: 120px; overflow: auto; border-top: 1px solid var(--line); }
+.errors:empty { display: none; }
+.errors li button { width: 100%; text-align: left; background: none; border: 0; border-radius: 0; padding: 4px 16px; font: 12px var(--mono); color: var(--error); overflow-wrap: anywhere; }
+.errors li button:hover { background: var(--raised); }
+
+.params { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
+.params .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.params .head .actions button { padding: 3px 8px; font-size: 12px; }
+.plist { overflow: auto; padding: 4px 0 16px; flex: 1; }
+.param { padding: 10px 16px; display: grid; gap: 6px; border-bottom: 1px solid #1f232c; }
+.param .top { display: flex; align-items: center; gap: 6px; }
+.param .name { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+.param .type { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.param .changed { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); visibility: hidden; }
+.param.is-changed .changed { visibility: visible; }
+.param .reset { margin-left: auto; background: none; border: 0; padding: 0 2px; color: var(--muted); visibility: hidden; font-size: 12px; }
+.param.is-changed .reset { visibility: visible; }
+.param .reset:hover { color: var(--accent); }
+.param .desc { color: var(--muted); font-size: 12px; }
+.ctl { display: grid; grid-template-columns: auto minmax(0, 1fr) 72px; align-items: center; gap: 8px; }
+.ctl .axis { font: 11px var(--mono); color: var(--muted); width: 10px; }
+.ctl input[type="range"] { width: 100%; accent-color: var(--accent); }
+.ctl input[type="number"], .ctl input[type="text"] { width: 72px; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ctl.color { grid-template-columns: 44px 96px; }
+.ctl input[type="color"] { width: 44px; height: 28px; padding: 0 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.switch input { width: 16px; height: 16px; accent-color: var(--accent); }
+.params .empty { padding: 16px; color: var(--muted); }
+.params .empty code { font-family: var(--mono); color: var(--fg); font-size: 11.5px; display: block; margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; font-family: var(--mono); font-size: 12px; z-index: 10; max-width: calc(100% - 32px); }
+
+@media (max-width: 1100px) {
+  main { grid-template-columns: 200px minmax(0, 1fr) 300px; }
+}
+@media (max-width: 860px) {
+  .app { height: auto; min-height: 100%; }
+  main { grid-template-columns: minmax(0, 1fr); }
+  .shaders { border-right: 0; border-bottom: 1px solid var(--line); }
+  .shaders ul { max-height: 180px; }
+  .center { grid-template-rows: auto auto auto; }
+  .stage { height: min(80vw, 420px); }
+  .editor { height: 360px; }
+  .params { border-left: 0; border-top: 1px solid var(--line); order: 2; }
+  .center { order: 1; }
+  .shaders { order: 0; }
+  header { padding-inline: 16px; }
+  .saveas input { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">Auto<span>FX</span> Editor</div>
+    <div class="title" id="title">No shader loaded</div>
+    <span class="status" id="status" hidden></span>
+    <div class="actions">
+      <label class="field" for="open-file"><button type="button" id="open-btn">Open…</button></label>
+      <input type="file" id="open-file" accept=".glsl,.frag,.txt" hidden>
+      <button type="button" id="copy-btn" disabled>Copy</button>
+      <button type="button" id="download-btn" disabled>Download</button>
+      <button type="button" id="saveas-btn" disabled hidden>Save as…</button>
+      <button type="button" id="save-btn" class="primary" disabled hidden title="Save (⌘S / Ctrl+S): writes code and current parameter values as the new defaults">Save</button>
+    </div>
+    <form class="saveas" id="saveas-form" hidden>
+      <label class="label" for="saveas-name">Save as</label>
+      <input type="text" id="saveas-name" spellcheck="false" autocomplete="off">
+      <button type="submit" class="primary">Save</button>
+      <button type="button" id="saveas-cancel">Cancel</button>
+    </form>
+  </header>
+
+  <main>
+    <nav class="shaders" aria-label="Shaders">
+      <div class="head">
+        <span class="label">Shaders</span>
+        <input type="search" id="filter" placeholder="Filter" aria-label="Filter shaders">
+      </div>
+      <ul id="shader-list"></ul>
+    </nav>
+
+    <section class="center">
+      <div class="stage checker" id="stage">
+        <canvas id="canvas" width="256" height="256" aria-label="Shader preview"></canvas>
+        <div class="drop" id="drop" hidden>Drop a .glsl file to open it</div>
+        <div class="glerror" id="glerror" hidden></div>
+      </div>
+
+      <div class="transport">
+        <button type="button" class="icon" id="prev-btn" title="Previous frame (←)" aria-label="Previous frame">◀︎</button>
+        <button type="button" class="icon" id="play-btn" title="Play / pause (Space)" aria-label="Pause">❚❚</button>
+        <button type="button" class="icon" id="next-btn" title="Next frame (→)" aria-label="Next frame">▶︎</button>
+        <div class="scrub">
+          <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Time">
+          <span class="time" id="time">0.00 / 1.00s</span>
+        </div>
+        <div class="field">
+          <label class="label" for="duration">Dur</label>
+          <input type="number" id="duration" min="0.1" max="60" step="0.1" value="1">
+        </div>
+        <div class="field">
+          <label class="label" for="rate">Speed</label>
+          <select id="rate">
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="seed">Seed</label>
+          <input type="number" id="seed" step="1" value="0">
+        </div>
+        <div class="field">
+          <label class="label" for="bg">Bg</label>
+          <select id="bg">
+            <option value="checker">Checker</option>
+            <option value="black">Black</option>
+            <option value="gray">Gray</option>
+            <option value="white">White</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="res">Res</label>
+          <select id="res">
+            <option value="1" selected>Output</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="code">
+        <div class="bar">
+          <span class="label">Shader code</span>
+          <span class="time" id="compile-info"></span>
+        </div>
+        <div class="editor">
+          <pre class="gutter" id="gutter" aria-hidden="true">1</pre>
+          <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="Shader code"></textarea>
+        </div>
+        <ul class="errors" id="errors"></ul>
+      </div>
+    </section>
+
+    <aside class="params" aria-label="Parameters">
+      <div class="head">
+        <span class="label" id="param-count">Parameters</span>
+        <div class="actions">
+          <button type="button" id="randomize-btn" disabled>Randomize</button>
+          <button type="button" id="reset-all-btn" disabled>Reset all</button>
+        </div>
+      </div>
+      <div class="plist" id="param-list"></div>
+    </aside>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script type="module" src="editor.js"></script>
+</body>
+</html>

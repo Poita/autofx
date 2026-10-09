@@ -127,6 +127,9 @@ Examples:
     # Generate sprite sheet from existing shader
     autofx explosion.glsl -s -o explosion.gif
 
+    # Tweak shader parameters in the browser editor
+    autofx editor examples/
+
 The generated shader code is automatically saved alongside the GIF.
 For example, explosion.gif will have explosion.glsl saved next to it.
 With -s/--spritesheet, a PNG sprite sheet is also saved (e.g., explosion.png).
@@ -588,8 +591,29 @@ async def run_edit_async(args: argparse.Namespace) -> int:
         return 1
 
 
+def editor_main(argv) -> int:
+    """`autofx editor [PATH]`: serve the browser shader editor."""
+    parser = argparse.ArgumentParser(
+        prog="autofx editor",
+        description="Open the shader editor: live preview and parameter controls in the browser",
+    )
+    parser.add_argument(
+        "path", nargs="?", default=".",
+        help="A .glsl file to open, or a directory of shaders to browse (default: current directory)"
+    )
+    parser.add_argument("--port", type=int, default=8765, help="Port to serve on (default: 8765)")
+    parser.add_argument("--no-browser", action="store_true", help="Don't open a browser window")
+    args = parser.parse_args(argv)
+
+    from . import editor_server
+    return editor_server.run_editor(args.path, port=args.port, open_browser=not args.no_browser)
+
+
 def main() -> int:
     """Main entry point for the CLI."""
+    if sys.argv[1:2] == ["editor"]:
+        return editor_main(sys.argv[2:])
+
     parser = create_parser()
     args = parser.parse_args()
 
