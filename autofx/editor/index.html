@@ -22,6 +22,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.45 var(--ui); }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -181,9 +182,9 @@ textarea { margin: 0; border: 0; resize: none; background: transparent; padding:
       </div>
 
       <div class="transport">
-        <button type="button" class="icon" id="prev-btn" title="Previous frame (←)" aria-label="Previous frame">◀︎</button>
+        <button type="button" class="icon" id="prev-btn" title="Previous frame (←)" aria-label="Previous frame">⏮</button>
         <button type="button" class="icon" id="play-btn" title="Play / pause (Space)" aria-label="Pause">❚❚</button>
-        <button type="button" class="icon" id="next-btn" title="Next frame (→)" aria-label="Next frame">▶︎</button>
+        <button type="button" class="icon" id="next-btn" title="Next frame (→)" aria-label="Next frame">⏭</button>
         <div class="scrub">
           <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Time">
           <span class="time" id="time">0.00 / 1.00s</span>
