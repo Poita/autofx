@@ -102,6 +102,9 @@ autofx explosion.glsl -s -f 16 -o explosion.gif
 
 # Edit an existing shader with AI
 autofx --edit magic-flames.glsl "make the flames blue instead" --loop -d 1.5 -f 45 -o blue-flames.gif
+
+# Tweak shader parameters live in the browser editor
+autofx editor examples/
 ```
 
 ### Options
@@ -148,6 +151,28 @@ autofx --edit examples/magic-flames.glsl "make the flames blue instead of purple
 | <img src="examples/magic-flames.gif" width="128"> | <img src="examples/blue-flames-black.gif" width="128"> |
 
 The AI modifies the shader's color palette while preserving the flame animation structure.
+
+## Shader Editor
+
+`autofx editor` opens a browser editor for tweaking shaders live:
+
+```bash
+autofx editor                      # browse every .glsl under the current directory
+autofx editor examples/            # browse a folder
+autofx editor fire.glsl            # open one shader
+autofx editor examples/ --port 9000 --no-browser
+```
+
+<img src="examples/editor.jpg" width="720" alt="The AutoFX editor showing an explosion shader with its parameter sliders">
+
+- **Live preview** rendered with WebGL2, with play/pause, a time scrubber, frame stepping, playback speed, seed, background (checker, black, gray, white) and preview resolution.
+- **Parameter controls** generated from the shader's `// @param` lines (see [Tweakable Parameters](#tweakable-parameters)): sliders for numbers and vectors, color pickers, toggles, per-parameter reset, Reset all and Randomize.
+- **Code editing** with live recompiling. Errors appear under the code with line numbers that match your file.
+- **Save** (⌘S / Ctrl+S) writes the code to disk with the current parameter values as the new defaults, so `autofx fire.glsl -o fire.gif` renders exactly what you see. **Save as…** writes a copy instead. Copy and Download give you the same text.
+
+Keys: Space plays and pauses; ← and → step one output frame. Unsaved edits are kept per shader while you switch between them.
+
+The server only listens on `127.0.0.1` and only reads and writes `.glsl` files under the folder it was started on.
 
 ## Library Usage
 
@@ -207,6 +232,9 @@ frames = render_shader(
     num_frames=10
 )
 
+# Override @param values (unlisted parameters use their defaults)
+hot = render_shader(shader_code, 1.0, (256, 256), 10, params={"intensity": 1.8, "coreColor": "#a0e0ff"})
+
 # Save as GIF
 save_gif(frames, "circle.gif", duration=1.0)
 ```
@@ -261,6 +289,39 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 | `iTime` | float | Current time in seconds (0 to duration) |
 | `iResolution` | vec3 | Viewport resolution (width, height, 1.0) |
 | `iSeed` | float | Random seed for variations (use with `-n`) |
+
+### Tweakable Parameters
+
+Shaders declare the knobs worth tweaking as comment lines, one per parameter:
+
+```glsl
+// @param <name> <type> <default> [min, max] "description"
+```
+
+```glsl
+// @param flameSpeed int 2 [1, 4] "Flicker cycles per loop"
+// @param flameHeight float 0.55 [0.3, 0.75] "Flame height as a fraction of the frame"
+// @param coreColor color #fff1c2 "Color of the hottest part of the flame"
+// @param wind vec2 (0.1, 0.0) [-1, 1] "Wind pushing the flame"
+// @param showSmoke bool true "Draw a faint smoke trail"
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    // flameSpeed, flameHeight, coreColor, ... are ready to use here
+}
+```
+
+| Type | Default | Range | In GLSL |
+|------|---------|-------|---------|
+| `float` | `1.5` | required | `float` |
+| `int` | `24` | required, whole numbers | `int` |
+| `bool` | `true` / `false` | none | `bool` |
+| `color` | `#ffb547` | none | `vec3` (RGB, 0-1) |
+| `vec2` | `(0.2, -0.5)` | required, per component | `vec2` |
+| `vec3` | `(1.0, 0.5, 0.25)` | required, per component | `vec3` |
+
+Each line declares its uniform, so the shader uses the name without declaring it. The default must sit inside the range, and the description is optional. Renders use the defaults unless you pass overrides (`render_shader(..., params={...})`), and the [editor](#shader-editor) builds its controls from these lines.
+
+Generated shaders come with 4-10 parameters picked for the effect (speed, size, intensity, colors, counts, turbulence, ...). Their ranges are chosen so every value keeps the effect in frame, keeps loops seamless and still lets one-shots finish. Shaders are also written to compile as GLSL ES 3.00, so they run in the browser editor.
 
 ### Transparency
 
@@ -352,6 +413,16 @@ A showcase of effects generated with AutoFX:
 | <img src="examples/gallery/smoke.gif" width="128"><br>Smoke | <img src="examples/gallery/ripple.gif" width="128"><br>Ripple | <img src="examples/gallery/torch.gif" width="128"><br>Torch | <img src="examples/gallery/ice.gif" width="128"><br>Ice |
 | <img src="examples/gallery/heal.gif" width="128"><br>Heal | <img src="examples/gallery/shock.gif" width="128"><br>Shock | <img src="examples/gallery/portal.gif" width="128"><br>Portal | <img src="examples/gallery/firework.gif" width="128"><br>Firework |
 | <img src="examples/gallery/runes.gif" width="128"><br>Runes | <img src="examples/gallery/meteor.gif" width="128"><br>Meteor | <img src="examples/gallery/poison.gif" width="128"><br>Poison | <img src="examples/gallery/shockwave.gif" width="128"><br>Shockwave |
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest                               # Python tests
+node --test tests/js/*.test.mjs      # editor tests (Node 18+)
+```
+
+`tests/param_cases.json` holds the `@param` cases both the Python parser (`autofx/params.py`) and the editor's parser (`autofx/editor/params.js`) must agree on.
 
 ## License
 
